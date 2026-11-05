@@ -24,7 +24,7 @@ public record RoomResponse(
         String selectedProposalId,
         List<Proposal> proposals) {
     public record Member(String id, String displayName, String role,boolean online) {}
-    public record Voter(String membershipId,String displayName) {}
-    public record Proposal(String id,String createdByMembershipId,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe) {}
+    public record Voter(String displayName) {}
+    public record Proposal(String id,boolean createdByMe,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe) {}
 
 }

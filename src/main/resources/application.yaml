@@ -30,3 +30,7 @@ app:
     allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
   self-ping:
     interval-ms: 300000
+  push:
+    vapid-public-key: ${PUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${PUSH_VAPID_PRIVATE_KEY:}
+    vapid-subject: ${PUSH_VAPID_SUBJECT:mailto:admin@letsplay.app}

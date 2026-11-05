@@ -46,6 +46,15 @@ public class RoomRealtimeHub {
         }
     }
 
+    public void publishProposalCreated(String roomId,String proposalId,String title) {
+        RoomStream stream=streams.get(roomId); if(stream==null)return;
+        synchronized(stream) {
+            ProposalCreated update=new ProposalCreated(roomId,proposalId,title,Instant.now());
+            var event=SseEmitter.event().name("room.proposal-created").data(update);
+            for(SseEmitter emitter:stream.emitters.keySet()) send(roomId,stream,emitter,event);
+        }
+    }
+
     public void keepAlive() {
         streams.forEach((roomId,stream) -> {
             synchronized(stream) {
@@ -99,6 +108,7 @@ public class RoomRealtimeHub {
     }
     public record RoomReady(String roomId,long revision){}
     public record RoomUpdate(String roomId,long revision,Instant changedAt){}
+    public record ProposalCreated(String roomId,String proposalId,String title,Instant createdAt){}
     public record PresenceUpdate(String roomId,String membershipId,boolean online,Set<String> onlineMembershipIds,long revision,Instant changedAt){}
     private static final class RoomStream {
         private final ConcurrentHashMap<SseEmitter,String> emitters=new ConcurrentHashMap<>();

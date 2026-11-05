@@ -40,3 +40,11 @@ Cron bên ngoài gọi `GET https://<render-service>.onrender.com/api/system/cro
 - Render có thể build từ `Dockerfile`; Render tự cấp `PORT` và `RENDER_EXTERNAL_URL`. Chỉ cần cấu hình `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` cho Neon. Health check path là `/api/system/health`.
 - Không commit file `.env`. Dùng `.env.example` làm mẫu cấu hình local.
 - FE trên Vercel cần `VITE_API_URL` trỏ đến URL BE công khai.
+
+## Ẩn danh và thông báo
+
+API phòng chỉ trả tên hiển thị của chính người đang xem; các thành viên khác nhận nhãn `Thành viên N`. Đề xuất có cờ `createdByMe` thay cho membership ID của người tạo. Phiếu vẫn có thể nhận biết ở phía cá nhân qua nhãn `Bạn`; các phiếu còn lại là `Ẩn danh`.
+
+Khi thêm đề xuất, backend gửi sự kiện SSE `room.proposal-created` và gửi Web Push đến các subscription đã đăng ký trong phòng. Web Push cần khai báo `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY` và `PUSH_VAPID_SUBJECT` trên Render hoặc `.env`. Tạo cặp khóa bằng `npx web-push generate-vapid-keys`; có thể để trống hai khóa nếu chỉ dùng thông báo trong phòng. FE đọc public key từ `/api/system/public-config`, không cần thêm biến môi trường FE.
+
+Người dùng cần bấm **Bật thông báo đẩy** trong từng phòng để cấp quyền và đăng ký thiết bị. Push notification hỗ trợ rung ở các trình duyệt/thiết bị có hỗ trợ; âm báo và rung khi đang mở phòng cũng tùy quyền của trình duyệt và phần cứng.

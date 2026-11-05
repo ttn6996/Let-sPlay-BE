@@ -25,10 +25,20 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class RoomController {
     private final RoomService service;
     private final RoomRealtimeHub realtimeHub;
+    private final RoomPushService pushService;
 
-    public RoomController(RoomService service, RoomRealtimeHub realtimeHub) {
+    public RoomController(RoomService service, RoomRealtimeHub realtimeHub, RoomPushService pushService) {
         this.service = service;
         this.realtimeHub = realtimeHub;
+        this.pushService=pushService;
+    }
+
+    @PostMapping(value="/{roomId}/push-subscriptions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary="Bật thông báo đẩy",description="Lưu Web Push subscription cho membership hiện tại để nhận thông báo đề xuất mới.")
+    public void subscribePush(@PathVariable String roomId,@Valid @RequestBody PushSubscriptionRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        RoomAccess access=service.authorize(roomId,bearer(authorization));
+        pushService.subscribe(roomId,access.member().getId(),request);
     }
 
     @PostMapping

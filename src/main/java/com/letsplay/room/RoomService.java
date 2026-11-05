@@ -27,13 +27,14 @@ public class RoomService {
     private final RoomProposalRepository proposals;
     private final RoomVoteRepository votes;
     private final RoomRealtimeHub realtime;
+    private final RoomPushService push;
     private final SecureRandom random = new SecureRandom();
 
-    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime) {
+    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime, RoomPushService push) {
         this.rooms = rooms;
         this.memberships = memberships;
         this.auth = auth;
-        this.proposals=proposals; this.votes=votes; this.realtime=realtime;
+        this.proposals=proposals; this.votes=votes; this.realtime=realtime; this.push=push;
     }
 
     @Transactional
@@ -122,8 +123,10 @@ public class RoomService {
     public RoomResponse addProposal(String roomId,String token,RoomRequests.CreateProposal request) {
         RoomAccess access=authorize(roomId,token);
         if(!"COLLECTING".equals(access.room().getPhase())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Phòng hiện không nhận đề xuất mới.");
-        proposals.save(new RoomProposal(UUID.randomUUID().toString(),roomId,access.member().getId(),request.title().trim(),clean(request.description()),request.scheduledTime()));
+        RoomProposal proposal=proposals.save(new RoomProposal(UUID.randomUUID().toString(),roomId,access.member().getId(),request.title().trim(),clean(request.description()),request.scheduledTime()));
         changed(access.room());
+        String title=proposal.getTitle();
+        afterCommit(()->push.notifyProposal(roomId,proposal.getId(),title));
         return response(access.room(),access.member(),null);
     }
 
@@ -253,11 +256,16 @@ public class RoomService {
         var votesByProposal=allVotes.stream().collect(java.util.stream.Collectors.groupingBy(RoomVote::getProposalId));
         var views=items.stream().map(p -> {
             var proposalVotes=votesByProposal.getOrDefault(p.getId(),java.util.List.of());
-            var voters=proposalVotes.stream().map(v -> members.get(v.getMembershipId())).filter(java.util.Objects::nonNull).map(m -> new RoomResponse.Voter(m.getId(),m.getDisplayName())).toList();
-            return new RoomResponse.Proposal(p.getId(),p.getCreatedByMembershipId(),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())));
+            var voters=proposalVotes.stream().map(v -> new RoomResponse.Voter(v.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh")).toList();
+            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())));
         }).toList();
         var onlineIds=realtime.onlineMembershipIds(room.getId());
-        var roomMembers=memberships.findAllByRoomIdOrderByCreatedAtAsc(room.getId()).stream().map(m -> new RoomResponse.Member(m.getId(),m.getDisplayName(),m.getRole(),onlineIds.contains(m.getId()))).toList();
+        var allMembers=memberships.findAllByRoomIdOrderByCreatedAtAsc(room.getId());
+        var roomMembers=java.util.stream.IntStream.range(0,allMembers.size()).mapToObj(index -> {
+            Membership listed=allMembers.get(index);
+            String displayName=listed.getId().equals(member.getId())?listed.getDisplayName():"Thành viên "+(index+1);
+            return new RoomResponse.Member(listed.getId(),displayName,listed.getRole(),onlineIds.contains(listed.getId()));
+        }).toList();
         var viewer=roomMembers.stream().filter(m -> m.id().equals(member.getId())).findFirst().orElse(new RoomResponse.Member(member.getId(),member.getDisplayName(),member.getRole(),onlineIds.contains(member.getId())));
         return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views);
     }
