@@ -41,6 +41,27 @@ public class RoomController {
         pushService.subscribe(roomId,access.member().getId(),request);
     }
 
+    @PutMapping("/{roomId}/availability/options")
+    @Operation(summary="Thiết lập các giờ có thể đi",description="Chủ phòng tạo hoặc thay danh sách giờ để thành viên chọn thời gian có thể tham gia.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse updateAvailabilityOptions(@PathVariable String roomId,@Valid @RequestBody AvailabilityOptionsRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.updateAvailabilityOptions(roomId,bearer(authorization),request);
+    }
+
+    @PutMapping("/{roomId}/availability")
+    @Operation(summary="Cập nhật giờ có thể tham gia",description="Thay toàn bộ các lựa chọn giờ của membership hiện tại; danh tính người chọn không được chia sẻ với thành viên khác.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse updateAvailabilityVotes(@PathVariable String roomId,@Valid @RequestBody AvailabilityVotesRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.updateAvailabilityVotes(roomId,bearer(authorization),request);
+    }
+
+    @PostMapping("/{roomId}/availability/{slotId}/select")
+    @Operation(summary="Chốt giờ phù hợp",description="Chủ phòng đặt ngày và giờ của phòng theo khung giờ đã thống nhất nhiều người tham gia nhất.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse selectAvailabilitySlot(@PathVariable String roomId,@PathVariable String slotId,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.selectAvailabilitySlot(roomId,slotId,bearer(authorization));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Tạo phòng", description = "Tạo phòng ở giai đoạn góp ý và cấp quyền chủ phòng cho phiên khách hiện tại.")

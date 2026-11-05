@@ -84,4 +84,5 @@ public class Room {
     public Instant getUpdatedAt() { return updatedAt; }
     public void bumpRevision() { this.revision++; this.updatedAt=Instant.now(); }
     public void changePhase(String phase,String selectedProposalId) { this.phase=phase; this.selectedProposalId=selectedProposalId; }
+    public void setEventDateTime(java.time.LocalDateTime value) { this.eventDate=value.toLocalDate(); this.eventTime=value.toLocalTime(); }
 }

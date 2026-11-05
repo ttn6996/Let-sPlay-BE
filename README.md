@@ -48,3 +48,7 @@ API phòng chỉ trả tên hiển thị của chính người đang xem; các t
 Khi thêm đề xuất, backend gửi sự kiện SSE `room.proposal-created` và gửi Web Push đến các subscription đã đăng ký trong phòng. Web Push cần khai báo `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY` và `PUSH_VAPID_SUBJECT` trên Render hoặc `.env`. Tạo cặp khóa bằng `npx web-push generate-vapid-keys`; có thể để trống hai khóa nếu chỉ dùng thông báo trong phòng. FE đọc public key từ `/api/system/public-config`, không cần thêm biến môi trường FE.
 
 Người dùng cần bấm **Bật thông báo đẩy** trong từng phòng để cấp quyền và đăng ký thiết bị. Push notification hỗ trợ rung ở các trình duyệt/thiết bị có hỗ trợ; âm báo và rung khi đang mở phòng cũng tùy quyền của trình duyệt và phần cứng.
+
+## Poll chọn giờ tham gia
+
+Chủ phòng có thể tạo tối đa 30 mốc giờ qua `PUT /api/rooms/{roomId}/availability/options`. Thành viên cập nhật lựa chọn của mình qua `PUT /api/rooms/{roomId}/availability`; API chỉ trả số lượng tổng hợp và cờ lựa chọn của viewer. Chủ phòng dùng `POST /api/rooms/{roomId}/availability/{slotId}/select` để cập nhật ngày giờ dự kiến. Flyway migration V9 tạo bảng mốc giờ và lựa chọn ẩn danh.
