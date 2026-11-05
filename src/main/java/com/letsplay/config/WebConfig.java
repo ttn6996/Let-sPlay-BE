@@ -14,8 +14,9 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns(allowedOriginPatterns.split(","))
-                .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("Content-Type", "Authorization", "X-Internal-Ping-Key", "Last-Event-ID", "X-Guest-Access-Token")
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD")
+                .allowedHeaders("*")
+                .exposedHeaders("Authorization", "X-Guest-Id", "X-Guest-Token", "Last-Event-ID", "X-Internal-Ping-Key")
                 .maxAge(3600);
     }
 }

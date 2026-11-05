@@ -1,6 +1,7 @@
 package com.letsplay.room;
 
 import com.letsplay.auth.AuthService;
+import com.letsplay.realtime.RoomRealtimeHub;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -13,6 +14,8 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -21,12 +24,16 @@ public class RoomService {
     private final RoomRepository rooms;
     private final MembershipRepository memberships;
     private final AuthService auth;
+    private final RoomProposalRepository proposals;
+    private final RoomVoteRepository votes;
+    private final RoomRealtimeHub realtime;
     private final SecureRandom random = new SecureRandom();
 
-    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth) {
+    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime) {
         this.rooms = rooms;
         this.memberships = memberships;
         this.auth = auth;
+        this.proposals=proposals; this.votes=votes; this.realtime=realtime;
     }
 
     @Transactional
@@ -76,13 +83,13 @@ public class RoomService {
         if (!"OPEN".equals(room.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phòng hiện không nhận thành viên mới.");
         }
-        return RoomPreview.from(room);
+        return RoomPreview.from(room,memberships.countByRoomId(room.getId()));
     }
 
     @Transactional(readOnly = true)
     public RoomResponse get(String roomId, String accessToken) {
         RoomAccess access = authorize(roomId, accessToken);
-        return RoomResponse.from(access.room(), access.member(), null, memberships.countByRoomId(roomId));
+        return response(access.room(),access.member(),null);
     }
 
     @Transactional(readOnly = true)
@@ -108,12 +115,63 @@ public class RoomService {
         if(old.member().getAccountId()!=null) return;
         if(memberships.findByRoomIdAndAccountId(roomId,accountId).isPresent()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Tài khoản đã có quyền vào phòng này.");
         old.member().claim(accountId);
+        changed(old.room());
+    }
+
+    @Transactional
+    public RoomResponse addProposal(String roomId,String token,RoomRequests.CreateProposal request) {
+        RoomAccess access=authorize(roomId,token);
+        if(!"COLLECTING".equals(access.room().getPhase())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Phòng hiện không nhận đề xuất mới.");
+        proposals.save(new RoomProposal(UUID.randomUUID().toString(),roomId,access.member().getId(),request.title().trim(),clean(request.description()),request.scheduledTime()));
+        changed(access.room());
+        return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse toggleVote(String roomId,String proposalId,String token) {
+        RoomAccess access=authorize(roomId,token);
+        if(!"VOTING".equals(access.room().getPhase())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Phòng chưa ở giai đoạn bình chọn.");
+        RoomProposal proposal=proposals.findById(proposalId).filter(p -> p.getRoomId().equals(roomId)).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy đề xuất."));
+        votes.findByProposalIdAndMembershipId(proposal.getId(),access.member().getId()).ifPresentOrElse(
+                vote -> votes.delete(vote),
+                () -> votes.save(new RoomVote(UUID.randomUUID().toString(),proposal.getId(),access.member().getId())));
+        changed(access.room());
+        return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse changePhase(String roomId,String token,RoomRequests.ChangePhase request) {
+        RoomAccess access=authorize(roomId,token);
+        if(!"HOST".equals(access.member().getRole())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Chỉ chủ phòng mới được đổi giai đoạn.");
+        String phase=request.phase().trim().toUpperCase(Locale.ROOT);
+        if(!java.util.Set.of("COLLECTING","VOTING","FINALIZED").contains(phase)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Giai đoạn không hợp lệ.");
+        String selected=null;
+        if("FINALIZED".equals(phase)) {
+            if(request.selectedProposalId()==null || request.selectedProposalId().isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Hãy chọn đề xuất để chốt.");
+            selected=proposals.findById(request.selectedProposalId()).filter(p -> p.getRoomId().equals(roomId)).map(RoomProposal::getId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy đề xuất được chọn."));
+        }
+        boolean allowed=switch(access.room().getPhase()) {
+            case "IDEAS","COLLECTING" -> "COLLECTING".equals(phase)||"VOTING".equals(phase);
+            case "VOTING" -> "VOTING".equals(phase)||"FINALIZED".equals(phase);
+            case "FINALIZED" -> "FINALIZED".equals(phase);
+            default -> false;
+        };
+        if(!allowed) throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể chuyển sang giai đoạn đã chọn.");
+        access.room().changePhase(phase,selected); changed(access.room());
+        return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public void leave(String roomId,String token) {
+        RoomAccess access=authorize(roomId,token);
+        if(!"MEMBER".equals(access.member().getRole())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Chủ phòng không thể rời phòng.");
+        memberships.delete(access.member()); changed(access.room());
     }
 
     private RoomResponse issueAccountMembership(Room room,String accountId,String displayName,String role) {
         Membership member=memberships.findByRoomIdAndAccountId(room.getId(),accountId).orElse(null);
-        if(member==null) { member=memberships.save(new Membership(UUID.randomUUID().toString(),room.getId(),accountId,displayName.trim(),role,true)); if("MEMBER".equals(role)) room.bumpRevision(); }
-        return RoomResponse.from(room,member,null,memberships.countByRoomId(room.getId()));
+        if(member==null) { member=memberships.save(new Membership(UUID.randomUUID().toString(),room.getId(),accountId,displayName.trim(),role,true)); if("MEMBER".equals(role)) changed(room); }
+        return response(room,member,null);
     }
 
     private RoomResponse issueMembership(Room room, UUID guestId, String displayName, String role) {
@@ -123,11 +181,35 @@ public class RoomService {
         if (member == null) {
             member = memberships.save(new Membership(UUID.randomUUID().toString(), room.getId(),
                     guestIdHash, sha256(token), displayName.trim(), role));
-            if ("MEMBER".equals(role)) room.bumpRevision();
+            if ("MEMBER".equals(role)) changed(room);
         } else {
             member.refreshSession(sha256(token), displayName.trim());
         }
-        return RoomResponse.from(room, member, token, memberships.countByRoomId(room.getId()));
+        return response(room,member,token);
+    }
+
+    private RoomResponse response(Room room,Membership member,String token) {
+        var items=proposals.findAllByRoomIdOrderByCreatedAtAsc(room.getId());
+        var itemIds=items.stream().map(RoomProposal::getId).toList();
+        var allVotes=itemIds.isEmpty()?java.util.List.<RoomVote>of():votes.findAllByProposalIdIn(itemIds);
+        var voterIds=allVotes.stream().map(RoomVote::getMembershipId).distinct().toList();
+        var members=memberships.findAllById(voterIds).stream().collect(java.util.stream.Collectors.toMap(Membership::getId,m -> m));
+        var votesByProposal=allVotes.stream().collect(java.util.stream.Collectors.groupingBy(RoomVote::getProposalId));
+        var views=items.stream().map(p -> {
+            var proposalVotes=votesByProposal.getOrDefault(p.getId(),java.util.List.of());
+            var voters=proposalVotes.stream().map(v -> members.get(v.getMembershipId())).filter(java.util.Objects::nonNull).map(m -> new RoomResponse.Voter(m.getId(),m.getDisplayName())).toList();
+            return new RoomResponse.Proposal(p.getId(),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())));
+        }).toList();
+        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),new RoomResponse.Member(member.getId(),member.getDisplayName(),member.getRole()),token,room.getSelectedProposalId(),views);
+    }
+
+    private void changed(Room room) {
+        room.bumpRevision();
+        String roomId=room.getId(); long revision=room.getRevision();
+        if(TransactionSynchronizationManager.isSynchronizationActive()) TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit(){realtime.publishRevision(roomId,revision);}
+        });
+        else realtime.publishRevision(roomId,revision);
     }
 
     private String newInviteCode() {

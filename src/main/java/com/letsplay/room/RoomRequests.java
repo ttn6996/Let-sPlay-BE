@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 public final class RoomRequests {
     private RoomRequests() {}
@@ -26,4 +27,13 @@ public final class RoomRequests {
 
     public record PreviewRoom(
             @NotBlank(message = "Vui lòng nhập mã tham gia.") @Size(min = 6, max = 8, message = "Mã tham gia gồm 6 đến 8 ký tự.") String inviteCode) {}
+
+    public record CreateProposal(
+            @NotBlank @Size(max=120) String title,
+            @Size(max=500) String description,
+            LocalDateTime scheduledTime) {}
+
+    public record ChangePhase(
+            @NotBlank String phase,
+            String selectedProposalId) {}
 }

@@ -46,8 +46,39 @@ public class RoomController {
 
     @PostMapping("/{roomId}/claim")
     @Operation(summary="Lưu phòng khách vào tài khoản",description="Gắn membership của phiên khách vào tài khoản để mở phòng trên thiết bị khác.")
-    public void claim(@PathVariable String roomId,@RequestHeader(value="Authorization",required=false) String authorization,@RequestHeader(value="X-Guest-Access-Token",required=false) String guestToken) {
-        service.claim(roomId,bearer(authorization),guestToken);
+    public void claim(@PathVariable String roomId,@RequestHeader(value="Authorization",required=false) String authorization,
+                      @RequestHeader(value="X-Guest-Token",required=false) String guestToken,
+                      @RequestHeader(value="X-Guest-Access-Token",required=false) String legacyGuestToken) {
+        service.claim(roomId,bearer(authorization),guestToken!=null?guestToken:legacyGuestToken);
+    }
+
+    @PostMapping("/{roomId}/proposals")
+    @Operation(summary="Thêm đề xuất",description="Thêm hoạt động hoặc khung giờ khi phòng đang ở giai đoạn góp ý.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse addProposal(@PathVariable String roomId,@Valid @RequestBody RoomRequests.CreateProposal request,@RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.addProposal(roomId,bearer(authorization),request);
+    }
+
+    @PostMapping("/{roomId}/proposals/{proposalId}/vote")
+    @Operation(summary="Bình chọn hoặc bỏ bình chọn",description="Bật/tắt phiếu của thành viên trong giai đoạn bình chọn.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse toggleVote(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.toggleVote(roomId,proposalId,bearer(authorization));
+    }
+
+    @PostMapping("/{roomId}/phase")
+    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chỉ chủ phòng được chuyển COLLECTING → VOTING → FINALIZED.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse changePhase(@PathVariable String roomId,@Valid @RequestBody RoomRequests.ChangePhase request,@RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.changePhase(roomId,bearer(authorization),request);
+    }
+
+    @PostMapping("/{roomId}/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary="Rời phòng",description="Thành viên rời phòng và các phiếu của họ được xóa theo membership.")
+    @SecurityRequirement(name="GuestSession")
+    public void leave(@PathVariable String roomId,@RequestHeader(value="Authorization",required=false) String authorization) {
+        service.leave(roomId,bearer(authorization));
     }
 
     @PostMapping("/preview")

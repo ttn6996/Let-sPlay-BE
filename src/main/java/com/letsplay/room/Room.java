@@ -45,6 +45,9 @@ public class Room {
     @Column(nullable = false)
     private long revision;
 
+    @Column(name="selected_proposal_id",length=36)
+    private String selectedProposalId;
+
     protected Room() {}
 
     public Room(String id, String name, String inviteCode, String creationRequestId,
@@ -53,7 +56,7 @@ public class Room {
         this.name = name;
         this.inviteCode = inviteCode;
         this.creationRequestId = creationRequestId;
-        this.phase = "IDEAS";
+        this.phase = "COLLECTING";
         this.status = "OPEN";
         this.eventDate = eventDate;
         this.eventTime = eventTime;
@@ -73,5 +76,7 @@ public class Room {
     public String getRegion() { return region; }
     public Instant getCreatedAt() { return createdAt; }
     public long getRevision() { return revision; }
+    public String getSelectedProposalId() { return selectedProposalId; }
     public void bumpRevision() { this.revision++; }
+    public void changePhase(String phase,String selectedProposalId) { this.phase=phase; this.selectedProposalId=selectedProposalId; }
 }
