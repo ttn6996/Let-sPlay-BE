@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -35,9 +36,16 @@ public class ApiExceptionHandler {
                 .body(Map.of("code", "INVALID_REQUEST", "message", "Dữ liệu gửi lên chưa hợp lệ."));
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String,String>> handleMissingRoute(NoResourceFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "code","NOT_FOUND",
+                "message","Không tìm thấy API được yêu cầu."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleUnexpected(Exception exception) {
-        logger.error("Unhandled API exception type: {}", exception.getClass().getSimpleName());
+        logger.error("Unhandled API exception type: {}", exception.getClass().getSimpleName(), exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("code", "INTERNAL_ERROR", "message", "Có lỗi xảy ra. Vui lòng thử lại."));
     }
