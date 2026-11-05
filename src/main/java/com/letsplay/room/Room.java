@@ -42,6 +42,9 @@ public class Room {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(nullable = false)
+    private long revision;
+
     protected Room() {}
 
     public Room(String id, String name, String inviteCode, String creationRequestId,
@@ -56,6 +59,7 @@ public class Room {
         this.eventTime = eventTime;
         this.region = region;
         this.createdAt = Instant.now();
+        this.revision = 0;
     }
 
     public String getId() { return id; }
@@ -68,4 +72,6 @@ public class Room {
     public LocalTime getEventTime() { return eventTime; }
     public String getRegion() { return region; }
     public Instant getCreatedAt() { return createdAt; }
+    public long getRevision() { return revision; }
+    public void bumpRevision() { this.revision++; }
 }

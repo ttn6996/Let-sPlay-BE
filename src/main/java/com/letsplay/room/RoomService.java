@@ -67,20 +67,21 @@ public class RoomService {
         }
         Membership member = memberships.findByRoomIdAndAccessTokenHash(roomId, sha256(accessToken))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Phiên đã hết hạn hoặc không hợp lệ."));
-        return RoomResponse.from(room, member, null);
+        return RoomResponse.from(room, member, null, memberships.countByRoomId(roomId));
     }
 
     private RoomResponse issueMembership(Room room, UUID guestId, String displayName, String role) {
         String token = randomToken();
         String guestIdHash = sha256(guestId.toString());
-        Membership member = memberships.findByRoomIdAndGuestIdHash(room.getId(), guestIdHash)
-                .map(existing -> {
-                    existing.refreshSession(sha256(token), displayName.trim());
-                    return existing;
-                })
-                .orElseGet(() -> memberships.save(new Membership(UUID.randomUUID().toString(), room.getId(),
-                        guestIdHash, sha256(token), displayName.trim(), role)));
-        return RoomResponse.from(room, member, token);
+        Membership member = memberships.findByRoomIdAndGuestIdHash(room.getId(), guestIdHash).orElse(null);
+        if (member == null) {
+            member = memberships.save(new Membership(UUID.randomUUID().toString(), room.getId(),
+                    guestIdHash, sha256(token), displayName.trim(), role));
+            if ("MEMBER".equals(role)) room.bumpRevision();
+        } else {
+            member.refreshSession(sha256(token), displayName.trim());
+        }
+        return RoomResponse.from(room, member, token, memberships.countByRoomId(room.getId()));
     }
 
     private String newInviteCode() {

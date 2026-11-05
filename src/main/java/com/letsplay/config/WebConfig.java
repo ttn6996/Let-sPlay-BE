@@ -15,7 +15,7 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns(allowedOriginPatterns.split(","))
                 .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("Content-Type", "Authorization", "X-Internal-Ping-Key")
+                .allowedHeaders("Content-Type", "Authorization", "X-Internal-Ping-Key", "Last-Event-ID")
                 .maxAge(3600);
     }
 }
