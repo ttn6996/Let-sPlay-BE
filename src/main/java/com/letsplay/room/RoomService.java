@@ -125,7 +125,7 @@ public class RoomService {
     @Transactional
     public RoomResponse addProposal(String roomId,String token,RoomRequests.CreateProposal request) {
         RoomAccess access=authorize(roomId,token);
-        if(!"COLLECTING".equals(access.room().getPhase())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Phòng hiện không nhận đề xuất mới.");
+        if(!java.util.Set.of("COLLECTING","VOTING").contains(access.room().getPhase())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Phòng hiện không nhận đề xuất mới.");
         RoomProposal proposal=proposals.save(new RoomProposal(UUID.randomUUID().toString(),roomId,access.member().getId(),request.title().trim(),clean(request.description()),request.scheduledTime()));
         changed(access.room());
         String title=proposal.getTitle();
@@ -193,17 +193,16 @@ public class RoomService {
         String selected=null;
         if(request.selectedProposalId()!=null&&!request.selectedProposalId().isBlank()) selected=proposals.findById(request.selectedProposalId()).filter(p -> p.getRoomId().equals(roomId)).map(RoomProposal::getId).orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,"Đề xuất được chọn không thuộc phòng này."));
         if("FINALIZED".equals(phase)&&selected==null) selected=proposals.findAllByRoomIdOrderByCreatedAtAsc(roomId).stream().max(java.util.Comparator.comparingLong(p->votes.countByProposalId(p.getId()))).map(RoomProposal::getId).orElse(null);
-        boolean allowed=switch(access.room().getPhase()) {
+        String currentPhase=access.room().getPhase().trim().toUpperCase(Locale.ROOT);
+        boolean allowed=switch(currentPhase) {
             case "IDEAS","COLLECTING" -> "COLLECTING".equals(phase)||"VOTING".equals(phase);
             case "VOTING" -> "COLLECTING".equals(phase)||"VOTING".equals(phase)||"FINALIZED".equals(phase);
             case "FINALIZED" -> "FINALIZED".equals(phase);
             default -> false;
         };
         if(!allowed) throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể chuyển sang giai đoạn đã chọn.");
-        if("VOTING".equals(access.room().getPhase())&&"COLLECTING".equals(phase)) {
-            java.util.List<String> proposalIds=proposals.findAllByRoomIdOrderByCreatedAtAsc(roomId).stream().map(RoomProposal::getId).toList();
-            if(!proposalIds.isEmpty()) votes.deleteAll(votes.findAllByProposalIdIn(proposalIds));
-        }
+        // Keep existing votes when reopening contributions. Members can add proposals during voting,
+        // so returning to collect more ideas must not erase any group's work.
         access.room().changePhase(phase,selected); changed(access.room());
         return response(access.room(),access.member(),null);
     }
@@ -238,6 +237,13 @@ public class RoomService {
         votes.deleteAllByProposalId(proposalId);proposals.delete(proposal);
         if(proposalId.equals(room.getSelectedProposalId()))room.changePhase(room.getPhase(),null);
         changed(room);return response(room,access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse setProposalCompleted(String roomId,String proposalId,String token,boolean completed){
+        RoomAccess access=authorize(roomId,token); RoomProposal proposal=proposalInRoom(roomId,proposalId);
+        proposal.setCompleted(completed); changed(access.room());
+        return response(access.room(),access.member(),null);
     }
 
     @Transactional
@@ -299,7 +305,7 @@ public class RoomService {
         var views=items.stream().map(p -> {
             var proposalVotes=votesByProposal.getOrDefault(p.getId(),java.util.List.of());
             var voters=proposalVotes.stream().map(v -> new RoomResponse.Voter(v.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh")).toList();
-            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())));
+            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())),p.isCompleted());
         }).toList();
         var onlineIds=realtime.onlineMembershipIds(room.getId());
         var allMembers=memberships.findAllByRoomIdOrderByCreatedAtAsc(room.getId());

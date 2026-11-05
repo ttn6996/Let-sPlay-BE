@@ -52,3 +52,7 @@ Người dùng cần bấm **Bật thông báo đẩy** trong từng phòng đ�
 ## Poll chọn giờ tham gia
 
 Chủ phòng có thể tạo tối đa 30 mốc giờ qua `PUT /api/rooms/{roomId}/availability/options`. Thành viên cập nhật lựa chọn của mình qua `PUT /api/rooms/{roomId}/availability`; API chỉ trả số lượng tổng hợp và cờ lựa chọn của viewer. Chủ phòng dùng `POST /api/rooms/{roomId}/availability/{slotId}/select` để cập nhật ngày giờ dự kiến. Flyway migration V9 tạo bảng mốc giờ và lựa chọn ẩn danh.
+
+## Bình chọn và thực hiện đề xuất
+
+Trong giai đoạn VOTING, thành viên vẫn có thể thêm đề xuất mới và cả nhóm có thể bình chọn cho đề xuất đó. Quay lại COLLECTING giữ nguyên phiếu hiện tại. Khi chốt một đề xuất, đề xuất đó được ghim đầu danh sách; trạng thái hoàn thành lưu qua `PUT /api/rooms/{roomId}/proposals/{proposalId}/completion` (migration V10).

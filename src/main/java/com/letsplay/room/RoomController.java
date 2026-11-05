@@ -100,7 +100,7 @@ public class RoomController {
     }
 
     @PostMapping("/{roomId}/phase")
-    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chủ phòng có thể chuyển COLLECTING ↔ VOTING trước khi chốt. Quay lại COLLECTING sẽ xóa phiếu hiện tại để bắt đầu lượt bình chọn mới. FINALIZED là trạng thái cuối.")
+    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chủ phòng có thể chuyển COLLECTING ↔ VOTING trước khi chốt. Quay lại COLLECTING giữ nguyên phiếu đã bầu; phòng vẫn có thể tiếp tục bình chọn sau khi thêm đề xuất. FINALIZED là trạng thái cuối.")
     @SecurityRequirement(name="GuestSession")
     public RoomResponse changePhase(@PathVariable String roomId,@Valid @RequestBody RoomRequests.ChangePhase request,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.changePhase(roomId,bearer(authorization),request);
@@ -126,6 +126,13 @@ public class RoomController {
     @SecurityRequirement(name="GuestSession")
     public RoomResponse deleteProposal(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.deleteProposal(roomId,proposalId,bearer(authorization));
+    }
+
+    @PutMapping("/{roomId}/proposals/{proposalId}/completion")
+    @Operation(summary="Đánh dấu đề xuất đã thực hiện",description="Thành viên có thể cập nhật trạng thái đã thực hiện của phương án trong phòng.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse setProposalCompleted(@PathVariable String roomId,@PathVariable String proposalId,@Valid @RequestBody ProposalCompletionRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.setProposalCompleted(roomId,proposalId,bearer(authorization),request.completed());
     }
 
     @DeleteMapping("/{roomId}/members/{membershipId}")

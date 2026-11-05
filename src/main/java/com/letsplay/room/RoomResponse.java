@@ -26,7 +26,7 @@ public record RoomResponse(
         List<AvailabilitySlot> availabilitySlots) {
     public record Member(String id, String displayName, String role,boolean online) {}
     public record Voter(String displayName) {}
-    public record Proposal(String id,boolean createdByMe,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe) {}
+    public record Proposal(String id,boolean createdByMe,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe,boolean completed) {}
     public record AvailabilitySlot(String id,LocalDateTime startsAt,long availableCount,boolean availableByMe,boolean selected) {}
 
 }

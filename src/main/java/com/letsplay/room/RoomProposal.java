@@ -13,6 +13,7 @@ public class RoomProposal {
     @Column(nullable=false,length=120) private String title;
     @Column(length=500) private String description;
     @Column(name="scheduled_time") private LocalDateTime scheduledTime;
+    @Column(nullable=false) private boolean completed;
     @Column(name="created_at",nullable=false) private Instant createdAt;
     protected RoomProposal() {}
     public RoomProposal(String id,String roomId,String creator,String title,String description,LocalDateTime scheduledTime) {
@@ -21,4 +22,6 @@ public class RoomProposal {
     public String getId(){return id;} public String getRoomId(){return roomId;} public String getCreatedByMembershipId(){return createdByMembershipId;}
     public String getTitle(){return title;} public String getDescription(){return description;} public LocalDateTime getScheduledTime(){return scheduledTime;} public Instant getCreatedAt(){return createdAt;}
     public void update(String title,String description,LocalDateTime scheduledTime){this.title=title;this.description=description;this.scheduledTime=scheduledTime;}
+    public boolean isCompleted(){return completed;}
+    public void setCompleted(boolean completed){this.completed=completed;}
 }
