@@ -32,14 +32,22 @@ public class RoomController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Tạo phòng", description = "Tạo phòng ở giai đoạn góp ý và cấp quyền chủ phòng cho phiên khách hiện tại.")
-    public RoomResponse create(@Valid @RequestBody RoomRequests.CreateRoom request) {
-        return service.create(request);
+    public RoomResponse create(@Valid @RequestBody RoomRequests.CreateRoom request, @RequestHeader(value="Authorization",required=false) String authorization) {
+        String token=bearer(authorization);
+        return token==null?service.create(request):service.createForAccount(request,token);
     }
 
     @PostMapping("/join")
     @Operation(summary = "Tham gia phòng", description = "Tạo hoặc tiếp tục membership bằng guestId và mã mời hợp lệ.")
-    public RoomResponse join(@Valid @RequestBody RoomRequests.JoinRoom request) {
-        return service.join(request);
+    public RoomResponse join(@Valid @RequestBody RoomRequests.JoinRoom request, @RequestHeader(value="Authorization",required=false) String authorization) {
+        String token=bearer(authorization);
+        return token==null?service.join(request):service.joinForAccount(request,token);
+    }
+
+    @PostMapping("/{roomId}/claim")
+    @Operation(summary="Lưu phòng khách vào tài khoản",description="Gắn membership của phiên khách vào tài khoản để mở phòng trên thiết bị khác.")
+    public void claim(@PathVariable String roomId,@RequestHeader(value="Authorization",required=false) String authorization,@RequestHeader(value="X-Guest-Access-Token",required=false) String guestToken) {
+        service.claim(roomId,bearer(authorization),guestToken);
     }
 
     @PostMapping("/preview")
@@ -52,10 +60,11 @@ public class RoomController {
     @Operation(summary = "Đọc thông tin phòng", description = "Yêu cầu Bearer access token đã cấp khi tạo hoặc tham gia phòng.")
     @SecurityRequirement(name = "GuestSession")
     public RoomResponse get(@PathVariable String roomId, @RequestHeader(value = "Authorization", required = false) String authorization) {
-        String token = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7) : null;
+        String token = bearer(authorization);
         return service.get(roomId, token);
     }
+
+    private static String bearer(String authorization) { return authorization!=null && authorization.startsWith("Bearer ")?authorization.substring(7):null; }
 
     @GetMapping(value = "/{roomId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Nghe thay đổi phòng theo thời gian thực", description = "SSE có kiểm tra membership. Gửi Last-Event-ID bằng revision gần nhất để nhận bù thay đổi khi reconnect.")

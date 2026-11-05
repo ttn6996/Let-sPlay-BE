@@ -16,10 +16,13 @@ public class Membership {
     @Column(name = "room_id", nullable = false, length = 36)
     private String roomId;
 
-    @Column(name = "guest_id_hash", nullable = false, length = 64)
+    @Column(name = "guest_id_hash", length = 64)
     private String guestIdHash;
 
-    @Column(name = "access_token_hash", nullable = false, unique = true, length = 64)
+    @Column(name = "account_id", length = 36)
+    private String accountId;
+
+    @Column(name = "access_token_hash", unique = true, length = 64)
     private String accessTokenHash;
 
     @Column(name = "display_name", nullable = false, length = 60)
@@ -49,8 +52,16 @@ public class Membership {
         this.displayName = displayName;
     }
 
+    public void claim(String accountId) { this.accountId = accountId; this.guestIdHash = null; this.accessTokenHash = null; }
+
+    public Membership(String id, String roomId, String accountId, String displayName, String role, boolean accountMember) {
+        this.id = id; this.roomId = roomId; this.accountId = accountId; this.displayName = displayName;
+        this.role = role; this.createdAt = Instant.now();
+    }
+
     public String getId() { return id; }
     public String getRoomId() { return roomId; }
     public String getDisplayName() { return displayName; }
     public String getRole() { return role; }
+    public String getAccountId() { return accountId; }
 }

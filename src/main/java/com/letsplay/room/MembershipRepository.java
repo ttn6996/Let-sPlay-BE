@@ -7,4 +7,6 @@ public interface MembershipRepository extends JpaRepository<Membership, String> 
     long countByRoomId(String roomId);
     Optional<Membership> findByRoomIdAndGuestIdHash(String roomId, String guestIdHash);
     Optional<Membership> findByRoomIdAndAccessTokenHash(String roomId, String accessTokenHash);
+    Optional<Membership> findByRoomIdAndAccountId(String roomId, String accountId);
+    java.util.List<Membership> findAllByAccountIdOrderByCreatedAtDesc(String accountId);
 }
