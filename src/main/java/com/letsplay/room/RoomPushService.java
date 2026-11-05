@@ -1,6 +1,5 @@
 package com.letsplay.room;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.letsplay.realtime.RoomRealtimeHub;
 import java.security.Security;
 import java.util.UUID;
@@ -15,13 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class RoomPushService {
     private final RoomPushSubscriptionRepository subscriptions;
     private final RoomRealtimeHub realtime;
-    private final ObjectMapper mapper;
     private final String publicKey, privateKey, subject;
 
     public RoomPushService(RoomPushSubscriptionRepository subscriptions, RoomRealtimeHub realtime,
-            ObjectMapper mapper, @Value("${app.push.vapid-public-key:}") String publicKey,
+            @Value("${app.push.vapid-public-key:}") String publicKey,
             @Value("${app.push.vapid-private-key:}") String privateKey, @Value("${app.push.vapid-subject:mailto:admin@letsplay.app}") String subject) {
-        this.subscriptions=subscriptions; this.realtime=realtime; this.mapper=mapper;
+        this.subscriptions=subscriptions; this.realtime=realtime;
         this.publicKey=publicKey; this.privateKey=privateKey; this.subject=subject;
         if (Security.getProvider("BC")==null) Security.addProvider(new BouncyCastleProvider());
     }
@@ -52,9 +50,7 @@ public class RoomPushService {
     public void notifyProposal(String roomId,String proposalId,String title) {
         realtime.publishProposalCreated(roomId,proposalId,title);
         if(publicKey.isBlank()||privateKey.isBlank()) return;
-        String payload;
-        try { payload=mapper.writeValueAsString(new PushPayload("Đề xuất mới","Có thành viên vừa thêm đề xuất vào phòng.","/rooms/"+roomId)); }
-        catch(Exception ignored){return;}
+        String payload="{\"title\":\"Đề xuất mới\",\"body\":\"Có thành viên vừa thêm đề xuất vào phòng.\",\"url\":\"/rooms/"+UUID.fromString(roomId)+"\"}";
         for(RoomPushSubscription subscription:subscriptions.findAllByRoomId(roomId)) {
             try {
                 var push=new PushService(publicKey,privateKey,subject);
@@ -66,5 +62,4 @@ public class RoomPushService {
             }
         }
     }
-    public record PushPayload(String title,String body,String url){}
 }
