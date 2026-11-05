@@ -146,10 +146,8 @@ public class RoomService {
         String phase=request.phase().trim().toUpperCase(Locale.ROOT);
         if(!java.util.Set.of("COLLECTING","VOTING","FINALIZED").contains(phase)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Giai đoạn không hợp lệ.");
         String selected=null;
-        if("FINALIZED".equals(phase)) {
-            if(request.selectedProposalId()==null || request.selectedProposalId().isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Hãy chọn đề xuất để chốt.");
-            selected=proposals.findById(request.selectedProposalId()).filter(p -> p.getRoomId().equals(roomId)).map(RoomProposal::getId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy đề xuất được chọn."));
-        }
+        if(request.selectedProposalId()!=null&&!request.selectedProposalId().isBlank()) selected=proposals.findById(request.selectedProposalId()).filter(p -> p.getRoomId().equals(roomId)).map(RoomProposal::getId).orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,"Đề xuất được chọn không thuộc phòng này."));
+        if("FINALIZED".equals(phase)&&selected==null) selected=proposals.findAllByRoomIdOrderByCreatedAtAsc(roomId).stream().max(java.util.Comparator.comparingLong(p->votes.countByProposalId(p.getId()))).map(RoomProposal::getId).orElse(null);
         boolean allowed=switch(access.room().getPhase()) {
             case "IDEAS","COLLECTING" -> "COLLECTING".equals(phase)||"VOTING".equals(phase);
             case "VOTING" -> "VOTING".equals(phase)||"FINALIZED".equals(phase);
@@ -164,9 +162,61 @@ public class RoomService {
     @Transactional
     public void leave(String roomId,String token) {
         RoomAccess access=authorize(roomId,token);
-        if(!"MEMBER".equals(access.member().getRole())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Chủ phòng không thể rời phòng.");
-        memberships.delete(access.member()); changed(access.room());
+        Membership leaving=access.member(); Room room=access.room();
+        if("HOST".equals(leaving.getRole())) {
+            Membership next=memberships.findAllByRoomIdAndIdNotOrderByCreatedAtAsc(roomId,leaving.getId()).stream().findFirst().orElse(null);
+            if(next==null){rooms.delete(room);afterCommit(()->realtime.closeRoom(roomId));return;}
+            next.promoteToHost();
+        }
+        memberships.delete(leaving); changed(room); afterCommit(()->realtime.disconnectMembership(roomId,leaving.getId()));
     }
+
+    @Transactional
+    public RoomResponse updateProposal(String roomId,String proposalId,String token,RoomRequests.CreateProposal request){
+        RoomAccess access=authorize(roomId,token); Room room=access.room();
+        RoomProposal proposal=proposalInRoom(roomId,proposalId);
+        ensureProposalEditable(room);
+        ensureCanManageProposal(access.member(),proposal);
+        proposal.update(request.title().trim(),clean(request.description()),request.scheduledTime());
+        changed(room);return response(room,access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse deleteProposal(String roomId,String proposalId,String token){
+        RoomAccess access=authorize(roomId,token); Room room=access.room();
+        RoomProposal proposal=proposalInRoom(roomId,proposalId);
+        ensureProposalEditable(room);ensureCanManageProposal(access.member(),proposal);
+        votes.deleteAllByProposalId(proposalId);proposals.delete(proposal);
+        if(proposalId.equals(room.getSelectedProposalId()))room.changePhase(room.getPhase(),null);
+        changed(room);return response(room,access.member(),null);
+    }
+
+    @Transactional
+    public void kickMember(String roomId,String membershipId,String token){
+        RoomAccess access=authorize(roomId,token);
+        if(!"HOST".equals(access.member().getRole()))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Chỉ chủ phòng mới được mời thành viên ra khỏi phòng.");
+        if(access.member().getId().equals(membershipId))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Chủ phòng không thể tự mời mình ra khỏi phòng.");
+        Membership target=memberships.findById(membershipId).filter(m->m.getRoomId().equals(roomId)).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy thành viên."));
+        votes.deleteAllByMembershipId(membershipId);
+        memberships.delete(target);changed(access.room());afterCommit(()->realtime.disconnectMembership(roomId,membershipId));
+    }
+
+    @Transactional(readOnly=true)
+    public java.util.List<MyRoomSummary> myRooms(String accountToken,java.util.List<String> guestTokens){
+        var found=new java.util.LinkedHashMap<String,Membership>();
+        if(accountToken!=null&&!accountToken.isBlank()){
+            String accountId=auth.accountId(accountToken);
+            memberships.findAllByAccountIdOrderByCreatedAtDesc(accountId).forEach(m->found.put(m.getId(),m));
+        }
+        if(guestTokens!=null)for(String token:guestTokens)if(token!=null&&!token.isBlank())memberships.findByAccessTokenHash(sha256(token)).ifPresent(m->found.put(m.getId(),m));
+        return found.values().stream().map(m->rooms.findById(m.getRoomId()).map(r->new MyRoomSummary(r.getId(),r.getName(),r.getInviteCode(),r.getPhase(),m.getRole(),(int)memberships.countByRoomId(r.getId()),r.getRevision(),r.getUpdatedAt())).orElse(null)).filter(java.util.Objects::nonNull).sorted(java.util.Comparator.comparing(MyRoomSummary::updatedAt).reversed()).toList();
+    }
+
+    private RoomProposal proposalInRoom(String roomId,String proposalId){return proposals.findById(proposalId).filter(p->p.getRoomId().equals(roomId)).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy đề xuất."));}
+    private static void ensureProposalEditable(Room room){if("FINALIZED".equals(room.getPhase()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể sửa đề xuất sau khi đã chốt lịch.");}
+    private static void ensureCanManageProposal(Membership member,RoomProposal proposal){if(!"HOST".equals(member.getRole())&&!member.getId().equals(proposal.getCreatedByMembershipId()))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Chỉ người tạo đề xuất hoặc chủ phòng mới được chỉnh sửa.");}
+    private void afterCommit(Runnable callback){if(TransactionSynchronizationManager.isSynchronizationActive())TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){@Override public void afterCommit(){callback.run();}});else callback.run();}
+    public record MyRoomSummary(String roomId,String name,String inviteCode,String phase,String viewerRole,int memberCount,long revision,java.time.Instant updatedAt){}
 
     private RoomResponse issueAccountMembership(Room room,String accountId,String displayName,String role) {
         Membership member=memberships.findByRoomIdAndAccountId(room.getId(),accountId).orElse(null);
@@ -183,7 +233,9 @@ public class RoomService {
                     guestIdHash, sha256(token), displayName.trim(), role));
             if ("MEMBER".equals(role)) changed(room);
         } else {
+            boolean displayNameChanged=!member.getDisplayName().equals(displayName.trim());
             member.refreshSession(sha256(token), displayName.trim());
+            if(displayNameChanged)changed(room);
         }
         return response(room,member,token);
     }
@@ -198,9 +250,12 @@ public class RoomService {
         var views=items.stream().map(p -> {
             var proposalVotes=votesByProposal.getOrDefault(p.getId(),java.util.List.of());
             var voters=proposalVotes.stream().map(v -> members.get(v.getMembershipId())).filter(java.util.Objects::nonNull).map(m -> new RoomResponse.Voter(m.getId(),m.getDisplayName())).toList();
-            return new RoomResponse.Proposal(p.getId(),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())));
+            return new RoomResponse.Proposal(p.getId(),p.getCreatedByMembershipId(),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())));
         }).toList();
-        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),new RoomResponse.Member(member.getId(),member.getDisplayName(),member.getRole()),token,room.getSelectedProposalId(),views);
+        var onlineIds=realtime.onlineMembershipIds(room.getId());
+        var roomMembers=memberships.findAllByRoomIdOrderByCreatedAtAsc(room.getId()).stream().map(m -> new RoomResponse.Member(m.getId(),m.getDisplayName(),m.getRole(),onlineIds.contains(m.getId()))).toList();
+        var viewer=roomMembers.stream().filter(m -> m.id().equals(member.getId())).findFirst().orElse(new RoomResponse.Member(member.getId(),member.getDisplayName(),member.getRole(),onlineIds.contains(member.getId())));
+        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views);
     }
 
     private void changed(Room room) {

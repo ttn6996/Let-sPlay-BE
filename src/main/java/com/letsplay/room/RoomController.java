@@ -8,8 +8,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -81,6 +83,39 @@ public class RoomController {
         service.leave(roomId,bearer(authorization));
     }
 
+    @PutMapping("/{roomId}/proposals/{proposalId}")
+    @Operation(summary="Sửa đề xuất",description="Người tạo hoặc chủ phòng có thể sửa đề xuất trước khi chốt.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse updateProposal(@PathVariable String roomId,@PathVariable String proposalId,@Valid @RequestBody RoomRequests.CreateProposal request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.updateProposal(roomId,proposalId,bearer(authorization),request);
+    }
+
+    @DeleteMapping("/{roomId}/proposals/{proposalId}")
+    @Operation(summary="Xóa đề xuất",description="Người tạo hoặc chủ phòng có thể xóa đề xuất trước khi chốt.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse deleteProposal(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.deleteProposal(roomId,proposalId,bearer(authorization));
+    }
+
+    @DeleteMapping("/{roomId}/members/{membershipId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary="Mời thành viên ra khỏi phòng",description="Chỉ chủ phòng mới được mời thành viên khác ra khỏi phòng.")
+    @SecurityRequirement(name="GuestSession")
+    public void kickMember(@PathVariable String roomId,@PathVariable String membershipId,@RequestHeader(value="Authorization",required=false) String authorization){
+        service.kickMember(roomId,membershipId,bearer(authorization));
+    }
+
+    @GetMapping("/mine")
+    @Operation(summary="Danh sách phòng của tôi",description="Hợp nhất phòng theo tài khoản và các guest token được gửi lên.")
+    public java.util.List<RoomService.MyRoomSummary> mine(@RequestHeader(value="Authorization",required=false) String authorization,
+            @RequestHeader(value="X-Guest-Token",required=false) String guestToken,
+            @RequestHeader(value="X-Guest-Tokens",required=false) String guestTokens){
+        java.util.List<String> tokens=new java.util.ArrayList<>();
+        if(guestToken!=null&&!guestToken.isBlank())tokens.add(guestToken);
+        if(guestTokens!=null&&!guestTokens.isBlank())for(String item:guestTokens.split(","))if(!item.isBlank())tokens.add(item.trim());
+        return service.myRooms(bearer(authorization),tokens);
+    }
+
     @PostMapping("/preview")
     @Operation(summary = "Xem trước phòng", description = "Kiểm tra mã mời trước khi yêu cầu người dùng nhập tên hiển thị.")
     public RoomPreview preview(@Valid @RequestBody RoomRequests.PreviewRoom request) {
@@ -116,6 +151,6 @@ public class RoomController {
                         HttpStatus.BAD_REQUEST, "Last-Event-ID phải là revision hợp lệ.");
             }
         }
-        return realtimeHub.subscribe(roomId, Math.max(0, sinceRevision), snapshot.revision());
+        return realtimeHub.subscribe(roomId,snapshot.member().id(),Math.max(0,sinceRevision),snapshot.revision());
     }
 }

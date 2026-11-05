@@ -64,4 +64,6 @@ public class Membership {
     public String getDisplayName() { return displayName; }
     public String getRole() { return role; }
     public String getAccountId() { return accountId; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void promoteToHost() { this.role="HOST"; }
 }

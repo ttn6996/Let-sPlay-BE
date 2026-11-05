@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 public class RoomProposal {
     @Id @Column(length=36) private String id;
     @Column(name="room_id",nullable=false,length=36) private String roomId;
-    @Column(name="created_by_membership_id",nullable=false,length=36) private String createdByMembershipId;
+    @Column(name="created_by_membership_id",length=36) private String createdByMembershipId;
     @Column(nullable=false,length=120) private String title;
     @Column(length=500) private String description;
     @Column(name="scheduled_time") private LocalDateTime scheduledTime;
@@ -20,4 +20,5 @@ public class RoomProposal {
     }
     public String getId(){return id;} public String getRoomId(){return roomId;} public String getCreatedByMembershipId(){return createdByMembershipId;}
     public String getTitle(){return title;} public String getDescription(){return description;} public LocalDateTime getScheduledTime(){return scheduledTime;} public Instant getCreatedAt(){return createdAt;}
+    public void update(String title,String description,LocalDateTime scheduledTime){this.title=title;this.description=description;this.scheduledTime=scheduledTime;}
 }

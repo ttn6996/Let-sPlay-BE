@@ -48,6 +48,9 @@ public class Room {
     @Column(name="selected_proposal_id",length=36)
     private String selectedProposalId;
 
+    @Column(name="updated_at",nullable=false)
+    private Instant updatedAt;
+
     protected Room() {}
 
     public Room(String id, String name, String inviteCode, String creationRequestId,
@@ -62,6 +65,7 @@ public class Room {
         this.eventTime = eventTime;
         this.region = region;
         this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
         this.revision = 0;
     }
 
@@ -77,6 +81,7 @@ public class Room {
     public Instant getCreatedAt() { return createdAt; }
     public long getRevision() { return revision; }
     public String getSelectedProposalId() { return selectedProposalId; }
-    public void bumpRevision() { this.revision++; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public void bumpRevision() { this.revision++; this.updatedAt=Instant.now(); }
     public void changePhase(String phase,String selectedProposalId) { this.phase=phase; this.selectedProposalId=selectedProposalId; }
 }
