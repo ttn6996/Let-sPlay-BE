@@ -69,7 +69,7 @@ public class RoomController {
     }
 
     @PostMapping("/{roomId}/phase")
-    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chỉ chủ phòng được chuyển COLLECTING → VOTING → FINALIZED.")
+    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chủ phòng có thể chuyển COLLECTING ↔ VOTING trước khi chốt. Quay lại COLLECTING sẽ xóa phiếu hiện tại để bắt đầu lượt bình chọn mới. FINALIZED là trạng thái cuối.")
     @SecurityRequirement(name="GuestSession")
     public RoomResponse changePhase(@PathVariable String roomId,@Valid @RequestBody RoomRequests.ChangePhase request,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.changePhase(roomId,bearer(authorization),request);

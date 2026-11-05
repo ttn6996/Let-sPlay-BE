@@ -150,11 +150,15 @@ public class RoomService {
         if("FINALIZED".equals(phase)&&selected==null) selected=proposals.findAllByRoomIdOrderByCreatedAtAsc(roomId).stream().max(java.util.Comparator.comparingLong(p->votes.countByProposalId(p.getId()))).map(RoomProposal::getId).orElse(null);
         boolean allowed=switch(access.room().getPhase()) {
             case "IDEAS","COLLECTING" -> "COLLECTING".equals(phase)||"VOTING".equals(phase);
-            case "VOTING" -> "VOTING".equals(phase)||"FINALIZED".equals(phase);
+            case "VOTING" -> "COLLECTING".equals(phase)||"VOTING".equals(phase)||"FINALIZED".equals(phase);
             case "FINALIZED" -> "FINALIZED".equals(phase);
             default -> false;
         };
         if(!allowed) throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể chuyển sang giai đoạn đã chọn.");
+        if("VOTING".equals(access.room().getPhase())&&"COLLECTING".equals(phase)) {
+            java.util.List<String> proposalIds=proposals.findAllByRoomIdOrderByCreatedAtAsc(roomId).stream().map(RoomProposal::getId).toList();
+            if(!proposalIds.isEmpty()) votes.deleteAll(votes.findAllByProposalIdIn(proposalIds));
+        }
         access.room().changePhase(phase,selected); changed(access.room());
         return response(access.room(),access.member(),null);
     }
