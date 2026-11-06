@@ -40,6 +40,11 @@ Cron bên ngoài gọi `GET https://<render-service>.onrender.com/api/system/cro
 - Render có thể build từ `Dockerfile`; Render tự cấp `PORT` và `RENDER_EXTERNAL_URL`. Chỉ cần cấu hình `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` cho Neon. Health check path là `/api/system/health`.
 - Không commit file `.env`. Dùng `.env.example` làm mẫu cấu hình local.
 - FE trên Vercel cần `VITE_API_URL` trỏ đến URL BE công khai.
+- Google Sign-In dùng biến `GOOGLE_CLIENT_ID` trên BE. Cùng giá trị này được trả qua `/api/system/public-config`, vì vậy FE không cần thêm biến môi trường riêng. Khai báo domain FE chạy thực tế trong Authorized JavaScript origins ở Google Cloud Console.
+
+## Đăng nhập Google
+
+FE tải Google Identity Services, gửi ID token tới `POST /api/auth/google`; BE xác minh chữ ký, audience và hạn token bằng Google API Client Library. Tài khoản mới được tạo không cần mật khẩu. Tài khoản email Gmail đã có được liên kết với Google sau khi xác minh email; email tổ chức dùng claim `hd`. Email không thuộc miền Google đã tồn tại cần đăng nhập bằng mật khẩu để tránh chiếm tài khoản. Migration V13 thêm Google subject duy nhất và cho phép tài khoản OAuth không có mật khẩu.
 
 ## Ẩn danh và thông báo
 

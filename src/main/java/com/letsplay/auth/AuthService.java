@@ -17,10 +17,12 @@ public class AuthService {
     private final AccountSessionRepository sessions;
     private final MembershipRepository memberships;
     private final RoomRepository rooms;
+    private final GoogleIdentityVerifier googleIdentityVerifier;
     private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder();
     private final SecureRandom random = new SecureRandom();
-    public AuthService(AccountRepository accounts, AccountSessionRepository sessions, MembershipRepository memberships, RoomRepository rooms) {
+    public AuthService(AccountRepository accounts, AccountSessionRepository sessions, MembershipRepository memberships, RoomRepository rooms, GoogleIdentityVerifier googleIdentityVerifier) {
         this.accounts=accounts; this.sessions=sessions; this.memberships=memberships; this.rooms=rooms;
+        this.googleIdentityVerifier=googleIdentityVerifier;
     }
 
     @Transactional
@@ -33,7 +35,29 @@ public class AuthService {
     @Transactional
     public AuthResponse login(AuthRequests.Login request) {
         Account account=accounts.findByEmail(normalize(request.email())).orElse(null);
-        if (account==null || !passwords.matches(request.password(), accountPassword(account))) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Email hoặc mật khẩu không chính xác.");
+        if (account==null || accountPassword(account)==null || !passwords.matches(request.password(), accountPassword(account))) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Email hoặc mật khẩu không chính xác.");
+        return issue(account);
+    }
+
+    @Transactional
+    public AuthResponse googleLogin(String credential) {
+        GoogleIdentityVerifier.GoogleIdentity identity=googleIdentityVerifier.verify(credential);
+        if(!identity.emailVerified())throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Google chưa xác minh địa chỉ email này.");
+        String email=normalize(identity.email());
+        Account account=accounts.findByGoogleSubject(identity.subject()).orElse(null);
+        if(account==null){
+            account=accounts.findByEmail(email).orElse(null);
+            if(account!=null){
+                String domain=email.substring(email.lastIndexOf('@')+1);
+                boolean googleAuthoritative=domain.equals("gmail.com")||(identity.hostedDomain()!=null&&!identity.hostedDomain().isBlank());
+                if(!googleAuthoritative)throw new ResponseStatusException(HttpStatus.CONFLICT,"Email đã có tài khoản. Hãy đăng nhập bằng mật khẩu trước để bảo vệ tài khoản.");
+                account.linkGoogle(identity.subject());
+            }else{
+                String name=identity.name()==null||identity.name().isBlank()?email.substring(0,email.indexOf('@')):identity.name().trim();
+                if(name.length()>60)name=name.substring(0,60);
+                account=accounts.save(new Account(UUID.randomUUID().toString(),email,null,name,identity.subject()));
+            }
+        }
         return issue(account);
     }
     // Password verification uses a dedicated query projection so the hash never leaves the service.

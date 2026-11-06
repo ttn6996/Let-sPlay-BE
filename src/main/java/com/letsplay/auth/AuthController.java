@@ -17,6 +17,8 @@ public class AuthController {
     public AuthService.AuthResponse register(@Valid @RequestBody AuthRequests.Register request){return service.register(request);}
     @PostMapping("/login") @Operation(summary="Đăng nhập")
     public AuthService.AuthResponse login(@Valid @RequestBody AuthRequests.Login request){return service.login(request);}
+    @PostMapping("/google") @Operation(summary="Đăng nhập bằng Google",description="Xác minh Google ID token phía máy chủ rồi tạo hoặc đăng nhập tài khoản.")
+    public AuthService.AuthResponse googleLogin(@Valid @RequestBody GoogleLoginRequest request){return service.googleLogin(request.credential());}
     @GetMapping("/me") @Operation(summary="Thông tin tài khoản hiện tại")
     public AuthService.Profile me(@RequestHeader(value="Authorization",required=false) String authorization){return service.me(bearer(authorization));}
     @GetMapping("/rooms") @Operation(summary="Danh sách phòng đã lưu")

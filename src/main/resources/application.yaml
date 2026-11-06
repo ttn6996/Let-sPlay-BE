@@ -34,3 +34,5 @@ app:
     vapid-public-key: ${PUSH_VAPID_PUBLIC_KEY:}
     vapid-private-key: ${PUSH_VAPID_PRIVATE_KEY:}
     vapid-subject: ${PUSH_VAPID_SUBJECT:mailto:admin@letsplay.app}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
