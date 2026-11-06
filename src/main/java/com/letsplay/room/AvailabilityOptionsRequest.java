@@ -1,8 +1,9 @@
 package com.letsplay.room;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public record AvailabilityOptionsRequest(@NotNull @Size(min=1,max=30) List<@NotNull LocalDateTime> startsAt) {}
+public record AvailabilityOptionsRequest(@NotBlank @Size(max=100) String title,@NotNull @Size(min=1,max=30) List<@NotNull LocalDateTime> startsAt) {}

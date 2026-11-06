@@ -152,8 +152,16 @@ public class RoomService {
         if("FINALIZED".equals(access.room().getPhase()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể đổi khung giờ sau khi đã chốt lịch.");
         var distinct=request.startsAt().stream().distinct().toList();
         if(distinct.size()!=request.startsAt().size())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Không thể thêm trùng khung giờ.");
-        availabilitySlots.deleteAllByRoomId(roomId);
-        availabilitySlots.saveAll(distinct.stream().map(start->new RoomAvailabilitySlot(UUID.randomUUID().toString(),roomId,start)).toList());
+        String title=request.title().trim();
+        if(title.isBlank())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Vui lòng nhập tiêu đề bình chọn.");
+        var existing=availabilitySlots.findAllByRoomIdOrderByStartsAtAsc(roomId);
+        var currentTimes=existing.stream().map(RoomAvailabilitySlot::getStartsAt).sorted().toList();
+        var nextTimes=distinct.stream().sorted().toList();
+        if(!currentTimes.equals(nextTimes)) {
+            availabilitySlots.deleteAllByRoomId(roomId);
+            availabilitySlots.saveAll(distinct.stream().map(start->new RoomAvailabilitySlot(UUID.randomUUID().toString(),roomId,start)).toList());
+        }
+        access.room().setAvailabilityTitle(title);
         changed(access.room());
         return response(access.room(),access.member(),null);
     }
@@ -320,7 +328,7 @@ public class RoomService {
         var slotVotes=slotIds.isEmpty()?java.util.List.<RoomAvailabilityVote>of():availabilityVotes.findAllBySlotIdIn(slotIds);
         var voteCounts=slotVotes.stream().collect(java.util.stream.Collectors.groupingBy(RoomAvailabilityVote::getSlotId,java.util.stream.Collectors.counting()));
         var slotsView=slots.stream().map(slot->new RoomResponse.AvailabilitySlot(slot.getId(),slot.getStartsAt(),voteCounts.getOrDefault(slot.getId(),0L),slotVotes.stream().anyMatch(v->v.getSlotId().equals(slot.getId())&&v.getMembershipId().equals(member.getId())),room.getEventDate()!=null&&room.getEventTime()!=null&&room.getEventDate().atTime(room.getEventTime()).equals(slot.getStartsAt()))).toList();
-        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views,slotsView);
+        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views,slotsView,room.getAvailabilityTitle());
     }
 
     private void changed(Room room) {

@@ -42,7 +42,7 @@ public class RoomController {
     }
 
     @PutMapping("/{roomId}/availability/options")
-    @Operation(summary="Thiết lập các giờ có thể đi",description="Chủ phòng tạo hoặc thay danh sách giờ để thành viên chọn thời gian có thể tham gia.")
+    @Operation(summary="Thiết lập poll giờ hẹn",description="Chủ phòng sửa tiêu đề poll và danh sách giờ để thành viên chọn nhiều thời điểm có thể tham gia.")
     @SecurityRequirement(name="GuestSession")
     public RoomResponse updateAvailabilityOptions(@PathVariable String roomId,@Valid @RequestBody AvailabilityOptionsRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.updateAvailabilityOptions(roomId,bearer(authorization),request);

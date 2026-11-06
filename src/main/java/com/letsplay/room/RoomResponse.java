@@ -23,7 +23,8 @@ public record RoomResponse(
         String accessToken,
         String selectedProposalId,
         List<Proposal> proposals,
-        List<AvailabilitySlot> availabilitySlots) {
+        List<AvailabilitySlot> availabilitySlots,
+        String availabilityTitle) {
     public record Member(String id, String displayName, String role,boolean online) {}
     public record Voter(String displayName) {}
     public record Proposal(String id,boolean createdByMe,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe,boolean completed) {}

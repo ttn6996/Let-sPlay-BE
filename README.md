@@ -56,3 +56,5 @@ Chủ phòng có thể tạo tối đa 30 mốc giờ qua `PUT /api/rooms/{roomI
 ## Bình chọn và thực hiện đề xuất
 
 Trong giai đoạn VOTING, thành viên vẫn có thể thêm đề xuất mới và cả nhóm có thể bình chọn cho đề xuất đó. Quay lại COLLECTING giữ nguyên phiếu hiện tại. Khi chốt một đề xuất, đề xuất đó được ghim đầu danh sách; trạng thái hoàn thành lưu qua `PUT /api/rooms/{roomId}/proposals/{proposalId}/completion` (migration V10).
+
+Poll giờ hẹn lưu tiêu đề tùy chỉnh cùng các mốc giờ (migration V11). Thành viên có thể chọn nhiều mốc rồi gửi toàn bộ lựa chọn trong một lần; nếu chỉ đổi tiêu đề, các phiếu hiện có được giữ nguyên.

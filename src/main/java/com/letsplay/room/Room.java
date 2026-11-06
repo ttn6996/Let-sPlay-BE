@@ -11,6 +11,7 @@ import java.time.LocalTime;
 @Entity
 @Table(name = "rooms")
 public class Room {
+    public static final String DEFAULT_AVAILABILITY_TITLE="Giờ nào mọi người đều rảnh?";
     @Id
     @Column(length = 36)
     private String id;
@@ -51,6 +52,9 @@ public class Room {
     @Column(name="updated_at",nullable=false)
     private Instant updatedAt;
 
+    @Column(name="availability_title",nullable=false,length=100)
+    private String availabilityTitle=DEFAULT_AVAILABILITY_TITLE;
+
     protected Room() {}
 
     public Room(String id, String name, String inviteCode, String creationRequestId,
@@ -82,7 +86,9 @@ public class Room {
     public long getRevision() { return revision; }
     public String getSelectedProposalId() { return selectedProposalId; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public String getAvailabilityTitle() { return availabilityTitle; }
     public void bumpRevision() { this.revision++; this.updatedAt=Instant.now(); }
     public void changePhase(String phase,String selectedProposalId) { this.phase=phase; this.selectedProposalId=selectedProposalId; }
     public void setEventDateTime(java.time.LocalDateTime value) { this.eventDate=value.toLocalDate(); this.eventTime=value.toLocalTime(); }
+    public void setAvailabilityTitle(String title) { this.availabilityTitle=title; }
 }
