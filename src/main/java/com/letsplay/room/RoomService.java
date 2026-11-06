@@ -30,14 +30,16 @@ public class RoomService {
     private final RoomPushService push;
     private final RoomAvailabilitySlotRepository availabilitySlots;
     private final RoomAvailabilityVoteRepository availabilityVotes;
+    private final RoomCommentRepository comments;
     private final SecureRandom random = new SecureRandom();
 
-    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime, RoomPushService push, RoomAvailabilitySlotRepository availabilitySlots, RoomAvailabilityVoteRepository availabilityVotes) {
+    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime, RoomPushService push, RoomAvailabilitySlotRepository availabilitySlots, RoomAvailabilityVoteRepository availabilityVotes, RoomCommentRepository comments) {
         this.rooms = rooms;
         this.memberships = memberships;
         this.auth = auth;
         this.proposals=proposals; this.votes=votes; this.realtime=realtime; this.push=push;
         this.availabilitySlots=availabilitySlots; this.availabilityVotes=availabilityVotes;
+        this.comments=comments;
     }
 
     @Transactional
@@ -130,6 +132,37 @@ public class RoomService {
         changed(access.room());
         String title=proposal.getTitle();
         afterCommit(()->push.notifyProposal(roomId,proposal.getId(),title));
+        return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse addAvailabilitySlots(String roomId,String token,AddAvailabilitySlotsRequest request) {
+        RoomAccess access=authorize(roomId,token);
+        if("FINALIZED".equals(access.room().getPhase()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể thêm khung giờ sau khi đã chốt lịch.");
+        var existing=availabilitySlots.findAllByRoomIdOrderByStartsAtAsc(roomId);
+        var existingTimes=existing.stream().map(RoomAvailabilitySlot::getStartsAt).collect(java.util.stream.Collectors.toSet());
+        var additions=request.startsAt().stream().distinct().filter(time->!existingTimes.contains(time)).toList();
+        if(additions.size()!=request.startsAt().size())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Danh sách có khung giờ trùng hoặc đã tồn tại.");
+        availabilitySlots.saveAll(additions.stream().map(time->new RoomAvailabilitySlot(UUID.randomUUID().toString(),roomId,time)).toList());
+        changed(access.room());
+        return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse commentOnProposal(String roomId,String proposalId,String token,RoomCommentRequest request) {
+        RoomAccess access=authorize(roomId,token);
+        proposalInRoom(roomId,proposalId);
+        comments.save(new RoomComment(UUID.randomUUID().toString(),roomId,access.member().getId(),proposalId,null,request.content().trim()));
+        changed(access.room());
+        return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse commentOnAvailabilitySlot(String roomId,String slotId,String token,RoomCommentRequest request) {
+        RoomAccess access=authorize(roomId,token);
+        availabilitySlots.findById(slotId).filter(slot->slot.getRoomId().equals(roomId)).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy khung giờ."));
+        comments.save(new RoomComment(UUID.randomUUID().toString(),roomId,access.member().getId(),null,slotId,request.content().trim()));
+        changed(access.room());
         return response(access.room(),access.member(),null);
     }
 
@@ -310,24 +343,28 @@ public class RoomService {
         var voterIds=allVotes.stream().map(RoomVote::getMembershipId).distinct().toList();
         var members=memberships.findAllById(voterIds).stream().collect(java.util.stream.Collectors.toMap(Membership::getId,m -> m));
         var votesByProposal=allVotes.stream().collect(java.util.stream.Collectors.groupingBy(RoomVote::getProposalId));
+        var proposalComments=itemIds.isEmpty()?java.util.List.<RoomComment>of():comments.findAllByProposalIdInOrderByCreatedAtAsc(itemIds);
+        var commentsByProposal=proposalComments.stream().collect(java.util.stream.Collectors.groupingBy(RoomComment::getProposalId));
         var views=items.stream().map(p -> {
             var proposalVotes=votesByProposal.getOrDefault(p.getId(),java.util.List.of());
             var voters=proposalVotes.stream().map(v -> new RoomResponse.Voter(v.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh")).toList();
-            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())),p.isCompleted());
+            var proposalDiscussion=commentsByProposal.getOrDefault(p.getId(),java.util.List.of()).stream().map(c->new RoomResponse.Comment(c.getId(),c.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh",c.getContent(),c.getCreatedAt(),c.getMembershipId().equals(member.getId()))).toList();
+            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())),p.isCompleted(),proposalDiscussion);
         }).toList();
         var onlineIds=realtime.onlineMembershipIds(room.getId());
         var allMembers=memberships.findAllByRoomIdOrderByCreatedAtAsc(room.getId());
         var roomMembers=java.util.stream.IntStream.range(0,allMembers.size()).mapToObj(index -> {
             Membership listed=allMembers.get(index);
-            String displayName=listed.getId().equals(member.getId())?listed.getDisplayName():"Thành viên "+(index+1);
-            return new RoomResponse.Member(listed.getId(),displayName,listed.getRole(),onlineIds.contains(listed.getId()));
+            return new RoomResponse.Member(listed.getId(),listed.getDisplayName(),listed.getRole(),onlineIds.contains(listed.getId()));
         }).toList();
         var viewer=roomMembers.stream().filter(m -> m.id().equals(member.getId())).findFirst().orElse(new RoomResponse.Member(member.getId(),member.getDisplayName(),member.getRole(),onlineIds.contains(member.getId())));
         var slots=availabilitySlots.findAllByRoomIdOrderByStartsAtAsc(room.getId());
         var slotIds=slots.stream().map(RoomAvailabilitySlot::getId).toList();
         var slotVotes=slotIds.isEmpty()?java.util.List.<RoomAvailabilityVote>of():availabilityVotes.findAllBySlotIdIn(slotIds);
         var voteCounts=slotVotes.stream().collect(java.util.stream.Collectors.groupingBy(RoomAvailabilityVote::getSlotId,java.util.stream.Collectors.counting()));
-        var slotsView=slots.stream().map(slot->new RoomResponse.AvailabilitySlot(slot.getId(),slot.getStartsAt(),voteCounts.getOrDefault(slot.getId(),0L),slotVotes.stream().anyMatch(v->v.getSlotId().equals(slot.getId())&&v.getMembershipId().equals(member.getId())),room.getEventDate()!=null&&room.getEventTime()!=null&&room.getEventDate().atTime(room.getEventTime()).equals(slot.getStartsAt()))).toList();
+        var slotComments=slotIds.isEmpty()?java.util.List.<RoomComment>of():comments.findAllByAvailabilitySlotIdInOrderByCreatedAtAsc(slotIds);
+        var commentsBySlot=slotComments.stream().collect(java.util.stream.Collectors.groupingBy(RoomComment::getAvailabilitySlotId));
+        var slotsView=slots.stream().map(slot->{var discussion=commentsBySlot.getOrDefault(slot.getId(),java.util.List.of()).stream().map(c->new RoomResponse.Comment(c.getId(),c.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh",c.getContent(),c.getCreatedAt(),c.getMembershipId().equals(member.getId()))).toList();return new RoomResponse.AvailabilitySlot(slot.getId(),slot.getStartsAt(),voteCounts.getOrDefault(slot.getId(),0L),slotVotes.stream().anyMatch(v->v.getSlotId().equals(slot.getId())&&v.getMembershipId().equals(member.getId())),room.getEventDate()!=null&&room.getEventTime()!=null&&room.getEventDate().atTime(room.getEventTime()).equals(slot.getStartsAt()),discussion);}).toList();
         return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views,slotsView,room.getAvailabilityTitle());
     }
 

@@ -48,6 +48,20 @@ public class RoomController {
         return service.updateAvailabilityOptions(roomId,bearer(authorization),request);
     }
 
+    @PostMapping("/{roomId}/availability/slots")
+    @Operation(summary="Đề xuất khung giờ",description="Mọi thành viên có thể thêm các khung giờ mới vào poll; phiếu và thảo luận đang có được giữ nguyên.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse addAvailabilitySlots(@PathVariable String roomId,@Valid @RequestBody AddAvailabilitySlotsRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.addAvailabilitySlots(roomId,bearer(authorization),request);
+    }
+
+    @PostMapping("/{roomId}/availability/{slotId}/comments")
+    @Operation(summary="Thảo luận khung giờ",description="Gửi bình luận ẩn danh trong khung giờ; chỉ chính người viết thấy nhãn Bạn.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse commentOnAvailabilitySlot(@PathVariable String roomId,@PathVariable String slotId,@Valid @RequestBody RoomCommentRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.commentOnAvailabilitySlot(roomId,slotId,bearer(authorization),request);
+    }
+
     @PutMapping("/{roomId}/availability")
     @Operation(summary="Cập nhật giờ có thể tham gia",description="Thay toàn bộ các lựa chọn giờ của membership hiện tại; danh tính người chọn không được chia sẻ với thành viên khác.")
     @SecurityRequirement(name="GuestSession")
@@ -97,6 +111,13 @@ public class RoomController {
     @SecurityRequirement(name="GuestSession")
     public RoomResponse toggleVote(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.toggleVote(roomId,proposalId,bearer(authorization));
+    }
+
+    @PostMapping("/{roomId}/proposals/{proposalId}/comments")
+    @Operation(summary="Thảo luận đề xuất",description="Gửi bình luận ẩn danh vào đề xuất để các thành viên trao đổi ngay trong phòng.")
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse commentOnProposal(@PathVariable String roomId,@PathVariable String proposalId,@Valid @RequestBody RoomCommentRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
+        return service.commentOnProposal(roomId,proposalId,bearer(authorization),request);
     }
 
     @PostMapping("/{roomId}/phase")

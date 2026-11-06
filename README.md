@@ -43,7 +43,7 @@ Cron bên ngoài gọi `GET https://<render-service>.onrender.com/api/system/cro
 
 ## Ẩn danh và thông báo
 
-API phòng chỉ trả tên hiển thị của chính người đang xem; các thành viên khác nhận nhãn `Thành viên N`. Đề xuất có cờ `createdByMe` thay cho membership ID của người tạo. Phiếu vẫn có thể nhận biết ở phía cá nhân qua nhãn `Bạn`; các phiếu còn lại là `Ẩn danh`.
+Tên hiển thị của tất cả thành viên được công khai trong danh sách phòng. Tác giả đề xuất không bị lộ qua API (`createdByMe` chỉ cho biết đề xuất của chính viewer hay không). Phiếu và bình luận không tiết lộ danh tính: người xem thấy `Ẩn danh`, còn chính người tạo thấy nhãn `Bạn`.
 
 Khi thêm đề xuất, backend gửi sự kiện SSE `room.proposal-created` và gửi Web Push đến các subscription đã đăng ký trong phòng. Web Push cần khai báo `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY` và `PUSH_VAPID_SUBJECT` trên Render hoặc `.env`. Tạo cặp khóa bằng `npx web-push generate-vapid-keys`; có thể để trống hai khóa nếu chỉ dùng thông báo trong phòng. FE đọc public key từ `/api/system/public-config`, không cần thêm biến môi trường FE.
 
@@ -57,4 +57,6 @@ Chủ phòng có thể tạo tối đa 30 mốc giờ qua `PUT /api/rooms/{roomI
 
 Trong giai đoạn VOTING, thành viên vẫn có thể thêm đề xuất mới và cả nhóm có thể bình chọn cho đề xuất đó. Quay lại COLLECTING giữ nguyên phiếu hiện tại. Khi chốt một đề xuất, đề xuất đó được ghim đầu danh sách; trạng thái hoàn thành lưu qua `PUT /api/rooms/{roomId}/proposals/{proposalId}/completion` (migration V10).
 
-Poll giờ hẹn lưu tiêu đề tùy chỉnh cùng các mốc giờ (migration V11). Thành viên có thể chọn nhiều mốc rồi gửi toàn bộ lựa chọn trong một lần; nếu chỉ đổi tiêu đề, các phiếu hiện có được giữ nguyên.
+Poll giờ hẹn lưu tiêu đề tùy chỉnh cùng các mốc giờ (migration V11). Thành viên có thể chọn nhiều mốc rồi gửi toàn bộ lựa chọn trong một lần; nếu chỉ đổi tiêu đề, các phiếu hiện có được giữ nguyên. Mọi thành viên có thể thêm khung giờ bằng `POST /api/rooms/{roomId}/availability/slots`; thao tác thêm không làm mất phiếu hay thảo luận cũ.
+
+Thành viên có thể bình luận ẩn danh ở từng khung giờ (`POST /api/rooms/{roomId}/availability/{slotId}/comments`) hoặc đề xuất (`POST /api/rooms/{roomId}/proposals/{proposalId}/comments`). Bình luận được trả kèm chi tiết phòng và đồng bộ qua revision realtime. Migration V12 tạo bảng thảo luận.
