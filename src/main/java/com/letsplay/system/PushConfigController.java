@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/system")
-@Tag(name="02 - System and Cron")
+@Tag(name="03. Hệ thống & Cron")
 public class PushConfigController {
     private final RoomPushService push;
     private final String googleClientId;

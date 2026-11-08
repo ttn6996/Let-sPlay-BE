@@ -16,19 +16,33 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Let's Play API")
                         .version("v1")
-                        .description("API cho tạo và tham gia phòng, kiểm tra tình trạng hệ thống và nhận cron ping."))
+                        .description("API được chia theo nghiệp vụ: tài khoản, phòng, và hệ thống. Trong nhóm phòng, các endpoint được gom tiếp theo quản lý phòng, đề xuất, khung giờ, kế hoạch, chi tiêu, lịch và thông báo."))
                 .components(new Components().addSecuritySchemes("GuestSession",
                         new SecurityScheme().type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer").bearerFormat("Opaque session token")));
     }
 
     @Bean
+    GroupedOpenApi accountsApi() {
+        return GroupedOpenApi.builder()
+                .group("01 - Tài khoản")
+                .pathsToMatch("/api/auth/**")
+                .build();
+    }
+
+    @Bean
     GroupedOpenApi roomsApi() {
-        return GroupedOpenApi.builder().group("01 - Rooms").pathsToMatch("/api/rooms/**").build();
+        return GroupedOpenApi.builder()
+                .group("02 - Phòng")
+                .pathsToMatch("/api/rooms/**")
+                .build();
     }
 
     @Bean
     GroupedOpenApi systemApi() {
-        return GroupedOpenApi.builder().group("02 - System and Cron").pathsToMatch("/api/system/**").build();
+        return GroupedOpenApi.builder()
+                .group("03 - Hệ thống & Cron")
+                .pathsToMatch("/api/system/**")
+                .build();
     }
 }

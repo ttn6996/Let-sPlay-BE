@@ -21,7 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/rooms")
-@Tag(name = "Rooms · Phòng", description = "Tạo phòng, xem trước mã mời và tham gia phòng.")
+@Tag(name = "01. Phòng · Quản lý & thành viên", description = "Tạo, xem trước, tham gia và quản lý thành viên trong phòng.")
 public class RoomController {
     private final RoomService service;
     private final RoomRealtimeHub realtimeHub;
@@ -35,42 +35,42 @@ public class RoomController {
 
     @PostMapping(value="/{roomId}/push-subscriptions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary="Bật thông báo đẩy",description="Lưu Web Push subscription cho membership hiện tại để nhận thông báo đề xuất mới.")
+    @Operation(summary="Bật thông báo đẩy",description="Lưu Web Push subscription cho membership hiện tại để nhận thông báo đề xuất mới.", tags={"07. Thông báo · Push"})
     public void subscribePush(@PathVariable String roomId,@Valid @RequestBody PushSubscriptionRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         RoomAccess access=service.authorize(roomId,bearer(authorization));
         pushService.subscribe(roomId,access.member().getId(),request);
     }
 
     @PutMapping("/{roomId}/availability/options")
-    @Operation(summary="Thiết lập poll giờ hẹn",description="Chủ phòng sửa tiêu đề poll và danh sách giờ để thành viên chọn nhiều thời điểm có thể tham gia.")
+    @Operation(summary="Thiết lập poll giờ hẹn",description="Chủ phòng sửa tiêu đề poll và danh sách giờ để thành viên chọn nhiều thời điểm có thể tham gia.", tags={"03. Khung giờ · Lịch rảnh"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse updateAvailabilityOptions(@PathVariable String roomId,@Valid @RequestBody AvailabilityOptionsRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.updateAvailabilityOptions(roomId,bearer(authorization),request);
     }
 
     @PostMapping("/{roomId}/availability/slots")
-    @Operation(summary="Đề xuất khung giờ",description="Mọi thành viên có thể thêm các khung giờ mới vào poll; phiếu và thảo luận đang có được giữ nguyên.")
+    @Operation(summary="Đề xuất khung giờ",description="Mọi thành viên có thể thêm các khung giờ mới vào poll; phiếu và thảo luận đang có được giữ nguyên.", tags={"03. Khung giờ · Lịch rảnh"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse addAvailabilitySlots(@PathVariable String roomId,@Valid @RequestBody AddAvailabilitySlotsRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.addAvailabilitySlots(roomId,bearer(authorization),request);
     }
 
     @PostMapping("/{roomId}/availability/{slotId}/comments")
-    @Operation(summary="Thảo luận khung giờ",description="Gửi bình luận ẩn danh trong khung giờ; chỉ chính người viết thấy nhãn Bạn.")
+    @Operation(summary="Thảo luận khung giờ",description="Gửi bình luận ẩn danh trong khung giờ; chỉ chính người viết thấy nhãn Bạn.", tags={"03. Khung giờ · Lịch rảnh"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse commentOnAvailabilitySlot(@PathVariable String roomId,@PathVariable String slotId,@Valid @RequestBody RoomCommentRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.commentOnAvailabilitySlot(roomId,slotId,bearer(authorization),request);
     }
 
     @PutMapping("/{roomId}/availability")
-    @Operation(summary="Cập nhật giờ có thể tham gia",description="Thay toàn bộ các lựa chọn giờ của membership hiện tại; danh tính người chọn không được chia sẻ với thành viên khác.")
+    @Operation(summary="Cập nhật giờ có thể tham gia",description="Thay toàn bộ các lựa chọn giờ của membership hiện tại; danh tính người chọn không được chia sẻ với thành viên khác.", tags={"03. Khung giờ · Lịch rảnh"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse updateAvailabilityVotes(@PathVariable String roomId,@Valid @RequestBody AvailabilityVotesRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.updateAvailabilityVotes(roomId,bearer(authorization),request);
     }
 
     @PostMapping("/{roomId}/availability/{slotId}/select")
-    @Operation(summary="Chốt giờ phù hợp",description="Chủ phòng đặt ngày và giờ của phòng theo khung giờ đã thống nhất nhiều người tham gia nhất.")
+    @Operation(summary="Chốt giờ phù hợp",description="Chủ phòng đặt ngày và giờ của phòng theo khung giờ đã thống nhất nhiều người tham gia nhất.", tags={"03. Khung giờ · Lịch rảnh"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse selectAvailabilitySlot(@PathVariable String roomId,@PathVariable String slotId,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.selectAvailabilitySlot(roomId,slotId,bearer(authorization));
@@ -100,28 +100,28 @@ public class RoomController {
     }
 
     @PostMapping("/{roomId}/proposals")
-    @Operation(summary="Thêm đề xuất",description="Thêm hoạt động hoặc khung giờ khi phòng đang ở giai đoạn góp ý.")
+    @Operation(summary="Thêm đề xuất",description="Thêm hoạt động hoặc khung giờ khi phòng đang ở giai đoạn góp ý.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse addProposal(@PathVariable String roomId,@Valid @RequestBody RoomRequests.CreateProposal request,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.addProposal(roomId,bearer(authorization),request);
     }
 
     @PostMapping("/{roomId}/proposals/{proposalId}/vote")
-    @Operation(summary="Bình chọn hoặc bỏ bình chọn",description="Bật/tắt phiếu của thành viên trong giai đoạn bình chọn.")
+    @Operation(summary="Bình chọn hoặc bỏ bình chọn",description="Bật/tắt phiếu của thành viên trong giai đoạn bình chọn.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse toggleVote(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.toggleVote(roomId,proposalId,bearer(authorization));
     }
 
     @PostMapping("/{roomId}/proposals/{proposalId}/comments")
-    @Operation(summary="Thảo luận đề xuất",description="Gửi bình luận ẩn danh vào đề xuất để các thành viên trao đổi ngay trong phòng.")
+    @Operation(summary="Thảo luận đề xuất",description="Gửi bình luận ẩn danh vào đề xuất để các thành viên trao đổi ngay trong phòng.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse commentOnProposal(@PathVariable String roomId,@PathVariable String proposalId,@Valid @RequestBody RoomCommentRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.commentOnProposal(roomId,proposalId,bearer(authorization),request);
     }
 
     @PostMapping("/{roomId}/phase")
-    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chủ phòng có thể chuyển COLLECTING ↔ VOTING trước khi chốt. Quay lại COLLECTING giữ nguyên phiếu đã bầu; phòng vẫn có thể tiếp tục bình chọn sau khi thêm đề xuất. FINALIZED là trạng thái cuối.")
+    @Operation(summary="Đổi giai đoạn hoặc chốt phương án",description="Chủ phòng có thể chuyển COLLECTING ↔ VOTING trước khi chốt. Quay lại COLLECTING giữ nguyên phiếu đã bầu; phòng vẫn có thể tiếp tục bình chọn sau khi thêm đề xuất. FINALIZED là trạng thái cuối.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse changePhase(@PathVariable String roomId,@Valid @RequestBody RoomRequests.ChangePhase request,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.changePhase(roomId,bearer(authorization),request);
@@ -136,21 +136,21 @@ public class RoomController {
     }
 
     @PutMapping("/{roomId}/proposals/{proposalId}")
-    @Operation(summary="Sửa đề xuất",description="Người tạo hoặc chủ phòng có thể sửa đề xuất trước khi chốt.")
+    @Operation(summary="Sửa đề xuất",description="Người tạo hoặc chủ phòng có thể sửa đề xuất trước khi chốt.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse updateProposal(@PathVariable String roomId,@PathVariable String proposalId,@Valid @RequestBody RoomRequests.CreateProposal request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.updateProposal(roomId,proposalId,bearer(authorization),request);
     }
 
     @DeleteMapping("/{roomId}/proposals/{proposalId}")
-    @Operation(summary="Xóa đề xuất",description="Người tạo hoặc chủ phòng có thể xóa đề xuất trước khi chốt.")
+    @Operation(summary="Xóa đề xuất",description="Người tạo hoặc chủ phòng có thể xóa đề xuất trước khi chốt.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse deleteProposal(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.deleteProposal(roomId,proposalId,bearer(authorization));
     }
 
     @PutMapping("/{roomId}/proposals/{proposalId}/completion")
-    @Operation(summary="Đánh dấu đề xuất đã thực hiện",description="Thành viên có thể cập nhật trạng thái đã thực hiện của phương án trong phòng.")
+    @Operation(summary="Đánh dấu đề xuất đã thực hiện",description="Thành viên có thể cập nhật trạng thái đã thực hiện của phương án trong phòng.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse setProposalCompleted(@PathVariable String roomId,@PathVariable String proposalId,@Valid @RequestBody ProposalCompletionRequest request,@RequestHeader(value="Authorization",required=false) String authorization){
         return service.setProposalCompleted(roomId,proposalId,bearer(authorization),request.completed());

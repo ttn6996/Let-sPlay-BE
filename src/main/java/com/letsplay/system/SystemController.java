@@ -12,7 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/system")
-@Tag(name = "System · Health & Cron", description = "Health check, ping nội bộ và ping dành cho cron bên thứ ba.")
+@Tag(name = "03. Hệ thống & Cron", description = "Health check, self-ping và cron ping bên thứ ba.")
 public class SystemController {
     private final SystemService service;
     private final SystemPingKey pingKey;

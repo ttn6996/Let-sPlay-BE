@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name="Accounts · Tài khoản", description="Đăng ký, đăng nhập và khôi phục danh sách phòng trên thiết bị khác.")
+@Tag(name="01. Tài khoản · Xác thực", description="Đăng ký, đăng nhập và khôi phục danh sách phòng trên thiết bị khác.")
 public class AuthController {
     private final AuthService service;
     public AuthController(AuthService service){this.service=service;}
