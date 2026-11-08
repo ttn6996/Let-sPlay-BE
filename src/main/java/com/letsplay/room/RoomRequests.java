@@ -31,7 +31,11 @@ public final class RoomRequests {
     public record CreateProposal(
             @NotBlank @Size(max=120) String title,
             @Size(max=500) String description,
-            LocalDateTime scheduledTime) {}
+            LocalDateTime scheduledTime,
+            @Size(max=200) String location,
+            @jakarta.validation.constraints.PositiveOrZero Long estimatedCostPerPerson,
+            @jakarta.validation.constraints.DecimalMin("-90.0") @jakarta.validation.constraints.DecimalMax("90.0") Double latitude,
+            @jakarta.validation.constraints.DecimalMin("-180.0") @jakarta.validation.constraints.DecimalMax("180.0") Double longitude) {}
 
     public record ChangePhase(
             @NotBlank String phase,

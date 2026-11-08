@@ -55,6 +55,13 @@ public class Room {
     @Column(name="availability_title",nullable=false,length=100)
     private String availabilityTitle=DEFAULT_AVAILABILITY_TITLE;
 
+    @Column(name="plan_notes",length=2000) private String planNotes;
+    @Column(name="event_latitude") private Double eventLatitude;
+    @Column(name="event_longitude") private Double eventLongitude;
+    @Column(name="meetup_latitude") private Double meetupLatitude;
+    @Column(name="meetup_longitude") private Double meetupLongitude;
+    @Column(name="weather_fallback",length=1000) private String weatherFallback;
+
     protected Room() {}
 
     public Room(String id, String name, String inviteCode, String creationRequestId,
@@ -87,8 +94,20 @@ public class Room {
     public String getSelectedProposalId() { return selectedProposalId; }
     public Instant getUpdatedAt() { return updatedAt; }
     public String getAvailabilityTitle() { return availabilityTitle; }
+    public String getPlanNotes() { return planNotes; }
+    public Double getEventLatitude() { return eventLatitude; }
+    public Double getEventLongitude() { return eventLongitude; }
+    public Double getMeetupLatitude() { return meetupLatitude; }
+    public Double getMeetupLongitude() { return meetupLongitude; }
+    public String getWeatherFallback() { return weatherFallback; }
     public void bumpRevision() { this.revision++; this.updatedAt=Instant.now(); }
     public void changePhase(String phase,String selectedProposalId) { this.phase=phase; this.selectedProposalId=selectedProposalId; }
     public void setEventDateTime(java.time.LocalDateTime value) { this.eventDate=value.toLocalDate(); this.eventTime=value.toLocalTime(); }
     public void setAvailabilityTitle(String title) { this.availabilityTitle=title; }
+    public void updatePlan(String name,LocalDate date,LocalTime time,String region,String notes,Double latitude,Double longitude,String fallback) {
+        this.name=name; this.eventDate=date; this.eventTime=time; this.region=region; this.planNotes=notes;
+        this.eventLatitude=latitude; this.eventLongitude=longitude; this.weatherFallback=fallback;
+    }
+    public void setMeetupPoint(Double latitude,Double longitude) { this.meetupLatitude=latitude; this.meetupLongitude=longitude; }
+    public void setStatus(String status) { this.status=status; }
 }

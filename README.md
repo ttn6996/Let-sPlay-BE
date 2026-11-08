@@ -29,7 +29,7 @@ Spring nạp `.env` khi ứng dụng chạy từ thư mục BE. Mặc định AP
 
 Cron bên ngoài gọi `GET https://<render-service>.onrender.com/api/system/cron-ping`; không cần token.
 
-`guestId` là UUID do client tạo để giữ một membership trong cùng tab. `requestId` là UUID idempotency cho yêu cầu tạo phòng. API trả access token một lần; DB chỉ giữ SHA-256 hash. Đây là phiên khách cho MVP, chưa hỗ trợ khôi phục quyền hay xác thực danh tính người thật.
+`guestId` là UUID giữ phiên khách khi chưa đăng nhập; `requestId` là UUID idempotency cho yêu cầu tạo phòng. Membership có thể liên kết với tài khoản để mở phòng trên thiết bị khác. Bearer token khách được trả một lần và DB chỉ giữ SHA-256 hash; token tài khoản có vòng đời riêng.
 
 ## Swagger UI và triển khai
 
@@ -65,3 +65,14 @@ Trong giai đoạn VOTING, thành viên vẫn có thể thêm đề xuất mới
 Poll giờ hẹn lưu tiêu đề tùy chỉnh cùng các mốc giờ (migration V11). Thành viên có thể chọn nhiều mốc rồi gửi toàn bộ lựa chọn trong một lần; nếu chỉ đổi tiêu đề, các phiếu hiện có được giữ nguyên. Mọi thành viên có thể thêm khung giờ bằng `POST /api/rooms/{roomId}/availability/slots`; thao tác thêm không làm mất phiếu hay thảo luận cũ.
 
 Thành viên có thể bình luận ẩn danh ở từng khung giờ (`POST /api/rooms/{roomId}/availability/{slotId}/comments`) hoặc đề xuất (`POST /api/rooms/{roomId}/proposals/{proposalId}/comments`). Bình luận được trả kèm chi tiết phòng và đồng bộ qua revision realtime. Migration V12 tạo bảng thảo luận.
+
+## Kế hoạch nhóm, chi tiêu và phối hợp
+
+- `PUT /api/rooms/{roomId}/plan`: chủ phòng sửa tên, ngày giờ, địa điểm, ghi chú, tọa độ và hủy/mở lại kế hoạch. Lịch sử thay đổi được lưu; thay đổi phát revision SSE và thông báo trong phòng/Web Push.
+- `PUT /api/rooms/{roomId}/attendance`: mỗi thành viên cập nhật trạng thái tham gia hoặc tình trạng trong ngày đi. `GET /collaboration` trả danh sách công khai cùng trạng thái xe, ưu tiên, thông báo và lịch sử kế hoạch.
+- `POST/PUT/DELETE /api/rooms/{roomId}/expenses`: cả phòng được thêm/sửa/xóa khoản chi. Payers và shares có thể gồm nhiều thành viên; tổng mỗi nhóm phân bổ phải bằng tổng khoản chi. `GET /expenses` trả sổ, số dư, gợi ý chuyển tiền và audit log. `POST /settlements` ghi nhận chuyển tiền đã hoàn tất và điều chỉnh số dư.
+- `PUT /meetup-point`, `/preferences`, `/ride`: lưu điểm xuất phát chung, sở thích/ngân sách thành viên và thông tin đi chung xe.
+- `GET/PUT /calendar-link`: lưu Google Calendar event ID theo membership. FE xin quyền Calendar riêng và đồng bộ sự kiện từ phòng sang lịch Google; không lưu access token Google ở BE.
+- Flyway V14–V16 thêm trạng thái tham gia, notification inbox, lịch sử kế hoạch, địa điểm và ngân sách đề xuất, sổ chi tiêu cùng lịch sử thanh toán. Dữ liệu người trả/chia và tên người sửa được chụp lại để vẫn đọc được nếu thành viên rời phòng.
+
+MapLibre GL JS hiển thị vector map từ OpenFreeMap; tìm địa điểm và dự báo dùng Open-Meteo. Các endpoint bên thứ ba được gọi từ FE, không cần API key riêng. Free API thời tiết hiện giới hạn mục đích phi thương mại; kiểm tra điều khoản nhà cung cấp nếu sản phẩm chuyển sang mục đích thương mại.

@@ -49,8 +49,13 @@ public class RoomPushService {
     @Transactional
     public void notifyProposal(String roomId,String proposalId,String title) {
         realtime.publishProposalCreated(roomId,proposalId,title);
+        notifyRoom(roomId,"Đề xuất mới","Có thành viên vừa thêm: "+title);
+    }
+
+    public void notifyRoom(String roomId,String title,String body) {
         if(publicKey.isBlank()||privateKey.isBlank()) return;
-        String payload="{\"title\":\"Đề xuất mới\",\"body\":\"Có thành viên vừa thêm đề xuất vào phòng.\",\"url\":\"/rooms/"+UUID.fromString(roomId)+"\"}";
+        String safeTitle=escapeJson(title),safeBody=escapeJson(body);
+        String payload="{\"title\":\""+safeTitle+"\",\"body\":\""+safeBody+"\",\"url\":\"/rooms/"+UUID.fromString(roomId)+"\"}";
         for(RoomPushSubscription subscription:subscriptions.findAllByRoomId(roomId)) {
             try {
                 var push=new PushService(publicKey,privateKey,subject);
@@ -62,4 +67,6 @@ public class RoomPushService {
             }
         }
     }
+
+    private static String escapeJson(String value){return value.replace("\\","\\\\").replace("\"","\\\"").replace("\n"," ").replace("\r"," ");}
 }

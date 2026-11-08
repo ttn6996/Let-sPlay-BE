@@ -24,11 +24,17 @@ public record RoomResponse(
         String selectedProposalId,
         List<Proposal> proposals,
         List<AvailabilitySlot> availabilitySlots,
-        String availabilityTitle) {
+        String availabilityTitle,
+        String planNotes,
+        Double eventLatitude,
+        Double eventLongitude,
+        Double meetupLatitude,
+        Double meetupLongitude,
+        String weatherFallback) {
     public record Member(String id, String displayName, String role,boolean online) {}
     public record Voter(String displayName) {}
     public record Comment(String id,String displayName,String content,Instant createdAt,boolean writtenByMe) {}
-    public record Proposal(String id,boolean createdByMe,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe,boolean completed,List<Comment> comments) {}
+    public record Proposal(String id,boolean createdByMe,String title,String description,LocalDateTime scheduledTime,Instant createdAt,long voteCount,List<Voter> voters,boolean votedByMe,boolean completed,List<Comment> comments,String location,Long estimatedCostPerPerson,Double latitude,Double longitude) {}
     public record AvailabilitySlot(String id,LocalDateTime startsAt,long availableCount,boolean availableByMe,boolean selected,List<Comment> comments) {}
 
 }
