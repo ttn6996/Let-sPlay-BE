@@ -107,10 +107,49 @@ public class RoomController {
     }
 
     @PostMapping("/{roomId}/proposals/{proposalId}/vote")
-    @Operation(summary="Bình chọn hoặc bỏ bình chọn",description="Bật/tắt phiếu của thành viên trong giai đoạn bình chọn.", tags={"02. Đề xuất · Góp ý & bình chọn"})
+    @Operation(summary="Bình chọn hoặc bỏ bình chọn (Legacy)",description="Bật/tắt phiếu của thành viên trong giai đoạn bình chọn.", tags={"02. Đề xuất · Góp ý & bình chọn"})
     @SecurityRequirement(name="GuestSession")
     public RoomResponse toggleVote(@PathVariable String roomId,@PathVariable String proposalId,@RequestHeader(value="Authorization",required=false) String authorization) {
         return service.toggleVote(roomId,proposalId,bearer(authorization));
+    }
+
+    @PutMapping("/{roomId}/proposals/{proposalId}/my-vote")
+    @Operation(summary="Bình chọn 3 mức (GAP-01)",description="Bình chọn 3 mức: 2 (Rất muốn), 1 (Ủng hộ), 0 (Để dịp khác/Pass). Điểm Borda được tính tự động.", tags={"02. Đề xuất · Góp ý & bình chọn"})
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse setVote(
+            @PathVariable String roomId,
+            @PathVariable String proposalId,
+            @Valid @RequestBody RoomRequests.VoteProposal request,
+            @RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.setVote(roomId, proposalId, bearer(authorization), request.value());
+    }
+
+    @PutMapping("/{roomId}/itinerary")
+    @Operation(summary="Thiết lập lịch trình chuyến đi nhiều chặng (GAP-02)",description="Chủ phòng sắp xếp danh sách các đề xuất thành lịch trình hoàn chỉnh.", tags={"02. Đề xuất · Góp ý & bình chọn"})
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse updateItinerary(
+            @PathVariable String roomId,
+            @Valid @RequestBody RoomRequests.UpdateItinerary request,
+            @RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.updateItinerary(roomId, bearer(authorization), request.selectedProposalIds());
+    }
+
+    @PostMapping("/{roomId}/end")
+    @Operation(summary="Kết thúc chuyến đi",description="Chủ phòng đánh dấu phòng kết thúc; kích hoạt chính sách lưu trữ album sau chuyến đi.", tags={"01. Phòng · Quản lý & thành viên"})
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse endRoom(
+            @PathVariable String roomId,
+            @RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.endRoom(roomId, bearer(authorization));
+    }
+
+    @PostMapping("/{roomId}/reopen")
+    @Operation(summary="Mở lại phòng chuyến đi",description="Chủ phòng mở lại phòng đã kết thúc.", tags={"01. Phòng · Quản lý & thành viên"})
+    @SecurityRequirement(name="GuestSession")
+    public RoomResponse reopenRoom(
+            @PathVariable String roomId,
+            @RequestHeader(value="Authorization",required=false) String authorization) {
+        return service.reopenRoom(roomId, bearer(authorization));
     }
 
     @PostMapping("/{roomId}/proposals/{proposalId}/comments")

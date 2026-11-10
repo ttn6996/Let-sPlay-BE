@@ -40,4 +40,10 @@ public final class RoomRequests {
     public record ChangePhase(
             @NotBlank String phase,
             String selectedProposalId) {}
+
+    public record VoteProposal(
+            @NotNull(message = "Giá trị bình chọn không được để trống.") Integer value) {}
+
+    public record UpdateItinerary(
+            java.util.List<String> selectedProposalIds) {}
 }

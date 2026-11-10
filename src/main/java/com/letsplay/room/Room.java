@@ -49,6 +49,12 @@ public class Room {
     @Column(name="selected_proposal_id",length=36)
     private String selectedProposalId;
 
+    @Column(name="selected_proposal_ids",columnDefinition="TEXT")
+    private String selectedProposalIds;
+
+    @Column(name="ended_at")
+    private Instant endedAt;
+
     @Column(name="updated_at",nullable=false)
     private Instant updatedAt;
 
@@ -92,6 +98,10 @@ public class Room {
     public Instant getCreatedAt() { return createdAt; }
     public long getRevision() { return revision; }
     public String getSelectedProposalId() { return selectedProposalId; }
+    public String getSelectedProposalIds() { return selectedProposalIds; }
+    public void setSelectedProposalIds(String selectedProposalIds) { this.selectedProposalIds = selectedProposalIds; }
+    public Instant getEndedAt() { return endedAt; }
+    public void setEndedAt(Instant endedAt) { this.endedAt = endedAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public String getAvailabilityTitle() { return availabilityTitle; }
     public String getPlanNotes() { return planNotes; }

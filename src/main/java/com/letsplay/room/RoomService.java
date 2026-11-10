@@ -1,6 +1,7 @@
 package com.letsplay.room;
 
 import com.letsplay.auth.AuthService;
+import com.letsplay.media.RoomAlbumRepository;
 import com.letsplay.realtime.RoomRealtimeHub;
 
 import java.nio.charset.StandardCharsets;
@@ -33,9 +34,10 @@ public class RoomService {
     private final RoomAvailabilityVoteRepository availabilityVotes;
     private final RoomCommentRepository comments;
     private final JdbcTemplate jdbc;
+    private final RoomAlbumRepository roomAlbums;
     private final SecureRandom random = new SecureRandom();
 
-    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime, RoomPushService push, RoomAvailabilitySlotRepository availabilitySlots, RoomAvailabilityVoteRepository availabilityVotes, RoomCommentRepository comments, JdbcTemplate jdbc) {
+    public RoomService(RoomRepository rooms, MembershipRepository memberships, AuthService auth, RoomProposalRepository proposals, RoomVoteRepository votes, RoomRealtimeHub realtime, RoomPushService push, RoomAvailabilitySlotRepository availabilitySlots, RoomAvailabilityVoteRepository availabilityVotes, RoomCommentRepository comments, JdbcTemplate jdbc, RoomAlbumRepository roomAlbums) {
         this.rooms = rooms;
         this.memberships = memberships;
         this.auth = auth;
@@ -43,6 +45,7 @@ public class RoomService {
         this.availabilitySlots=availabilitySlots; this.availabilityVotes=availabilityVotes;
         this.comments=comments;
         this.jdbc=jdbc;
+        this.roomAlbums=roomAlbums;
     }
 
     @Transactional
@@ -191,6 +194,80 @@ public class RoomService {
                 () -> votes.save(new RoomVote(UUID.randomUUID().toString(),proposal.getId(),access.member().getId())));
         changed(access.room());
         return response(access.room(),access.member(),null);
+    }
+
+    @Transactional
+    public RoomResponse setVote(String roomId, String proposalId, String token, int value) {
+        if (value < 0 || value > 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Giá trị bình chọn phải từ 0 đến 2 (0: Bỏ qua, 1: Ủng hộ, 2: Rất muốn).");
+        }
+        RoomAccess access = authorize(roomId, token);
+        ensureRoomOpen(access.room());
+        if (!"VOTING".equals(access.room().getPhase())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phòng chưa ở giai đoạn bình chọn.");
+        }
+        RoomProposal proposal = proposals.findById(proposalId).filter(p -> p.getRoomId().equals(roomId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đề xuất."));
+
+        votes.findByProposalIdAndMembershipId(proposal.getId(), access.member().getId()).ifPresentOrElse(
+                vote -> {
+                    vote.setVoteValue(value);
+                    votes.save(vote);
+                },
+                () -> votes.save(new RoomVote(UUID.randomUUID().toString(), proposal.getId(), access.member().getId(), value))
+        );
+        changed(access.room());
+        return response(access.room(), access.member(), null);
+    }
+
+    @Transactional
+    public RoomResponse updateItinerary(String roomId, String token, java.util.List<String> proposalIds) {
+        RoomAccess access = authorize(roomId, token);
+        ensureRoomOpen(access.room());
+        if (!"HOST".equals(access.member().getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ phòng mới được thiết lập lịch trình.");
+        }
+        if (proposalIds != null && !proposalIds.isEmpty()) {
+            access.room().setSelectedProposalIds(String.join(",", proposalIds));
+            access.room().changePhase(access.room().getPhase(), proposalIds.get(0));
+        } else {
+            access.room().setSelectedProposalIds(null);
+        }
+        changed(access.room());
+        return response(access.room(), access.member(), null);
+    }
+
+    @Transactional
+    public RoomResponse endRoom(String roomId, String token) {
+        RoomAccess access = authorize(roomId, token);
+        if (!"HOST".equals(access.member().getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ phòng mới có quyền kết thúc chuyến đi.");
+        }
+        access.room().setStatus("ENDED");
+        java.time.Instant now = java.time.Instant.now();
+        access.room().setEndedAt(now);
+        roomAlbums.findByRoomId(roomId).ifPresent(a -> {
+            a.onRoomEnded(now);
+            roomAlbums.save(a);
+        });
+        changed(access.room());
+        return response(access.room(), access.member(), null);
+    }
+
+    @Transactional
+    public RoomResponse reopenRoom(String roomId, String token) {
+        RoomAccess access = authorize(roomId, token);
+        if (!"HOST".equals(access.member().getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ phòng mới có quyền mở lại kèo.");
+        }
+        access.room().setStatus("OPEN");
+        access.room().setEndedAt(null);
+        roomAlbums.findByRoomId(roomId).ifPresent(a -> {
+            a.onRoomReopened();
+            roomAlbums.save(a);
+        });
+        changed(access.room());
+        return response(access.room(), access.member(), null);
     }
 
     @Transactional
@@ -369,7 +446,9 @@ public class RoomService {
             var proposalVotes=votesByProposal.getOrDefault(p.getId(),java.util.List.of());
             var voters=proposalVotes.stream().map(v -> new RoomResponse.Voter(v.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh")).toList();
             var proposalDiscussion=commentsByProposal.getOrDefault(p.getId(),java.util.List.of()).stream().map(c->new RoomResponse.Comment(c.getId(),c.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh",c.getContent(),c.getCreatedAt(),c.getMembershipId().equals(member.getId()))).toList();
-            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,proposalVotes.stream().anyMatch(v -> v.getMembershipId().equals(member.getId())),p.isCompleted(),proposalDiscussion,p.getLocation(),p.getEstimatedCostPerPerson(),p.getLatitude(),p.getLongitude());
+            long bordaScore = proposalVotes.stream().mapToLong(RoomVote::getVoteValue).sum();
+            Integer myVoteValue = proposalVotes.stream().filter(v -> v.getMembershipId().equals(member.getId())).map(RoomVote::getVoteValue).findFirst().orElse(null);
+            return new RoomResponse.Proposal(p.getId(),member.getId().equals(p.getCreatedByMembershipId()),p.getTitle(),p.getDescription(),p.getScheduledTime(),p.getCreatedAt(),proposalVotes.size(),voters,myVoteValue!=null,p.isCompleted(),proposalDiscussion,p.getLocation(),p.getEstimatedCostPerPerson(),p.getLatitude(),p.getLongitude(),bordaScore,myVoteValue);
         }).toList();
         var onlineIds=realtime.onlineMembershipIds(room.getId());
         var allMembers=memberships.findAllByRoomIdOrderByCreatedAtAsc(room.getId());
@@ -385,7 +464,10 @@ public class RoomService {
         var slotComments=slotIds.isEmpty()?java.util.List.<RoomComment>of():comments.findAllByAvailabilitySlotIdInOrderByCreatedAtAsc(slotIds);
         var commentsBySlot=slotComments.stream().collect(java.util.stream.Collectors.groupingBy(RoomComment::getAvailabilitySlotId));
         var slotsView=slots.stream().map(slot->{var discussion=commentsBySlot.getOrDefault(slot.getId(),java.util.List.of()).stream().map(c->new RoomResponse.Comment(c.getId(),c.getMembershipId().equals(member.getId())?"Bạn":"Ẩn danh",c.getContent(),c.getCreatedAt(),c.getMembershipId().equals(member.getId()))).toList();return new RoomResponse.AvailabilitySlot(slot.getId(),slot.getStartsAt(),voteCounts.getOrDefault(slot.getId(),0L),slotVotes.stream().anyMatch(v->v.getSlotId().equals(slot.getId())&&v.getMembershipId().equals(member.getId())),room.getEventDate()!=null&&room.getEventTime()!=null&&room.getEventDate().atTime(room.getEventTime()).equals(slot.getStartsAt()),discussion);}).toList();
-        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views,slotsView,room.getAvailabilityTitle(),room.getPlanNotes(),room.getEventLatitude(),room.getEventLongitude(),room.getMeetupLatitude(),room.getMeetupLongitude(),room.getWeatherFallback());
+        var selectedProposalIds = room.getSelectedProposalIds() != null && !room.getSelectedProposalIds().isBlank()
+                ? java.util.Arrays.asList(room.getSelectedProposalIds().split(","))
+                : java.util.List.<String>of();
+        return new RoomResponse(room.getId(),room.getName(),room.getInviteCode(),room.getPhase(),room.getStatus(),room.getEventDate(),room.getEventTime(),room.getRegion(),room.getCreatedAt(),room.getRevision(),memberships.countByRoomId(room.getId()),viewer,roomMembers,token,room.getSelectedProposalId(),views,slotsView,room.getAvailabilityTitle(),room.getPlanNotes(),room.getEventLatitude(),room.getEventLongitude(),room.getMeetupLatitude(),room.getMeetupLongitude(),room.getWeatherFallback(),selectedProposalIds,room.getEndedAt());
     }
 
     private void changed(Room room) {

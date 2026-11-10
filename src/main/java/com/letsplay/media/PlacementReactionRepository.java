@@ -1,0 +1,15 @@
+package com.letsplay.media;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface PlacementReactionRepository extends JpaRepository<PlacementReaction, String> {
+    List<PlacementReaction> findAllByPlacementId(String placementId);
+    Optional<PlacementReaction> findByPlacementIdAndAccountId(String placementId, String accountId);
+    void deleteByPlacementIdAndAccountId(String placementId, String accountId);
+    long countByPlacementId(String placementId);
+}
